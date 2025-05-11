@@ -4,7 +4,7 @@
 
 Bu proje, bir iş başvurusu kapsamında geliştirilmiş bir **Hava Aracı Üretim Takip Sistemi**'dir. Django ve Django Rest Framework kullanılarak geliştirilen bu uygulama, farklı hava aracı modellerinin (TB2, TB3, AKINCI, KIZILELMA) üretim süreçlerini, parça yönetimini (Kanat, Gövde, Kuyruk, Aviyonik), takım ve personel yönetimini, iş emirlerini ve stok takibini kapsamaktadır.
 
-Sistem, farklı kullanıcı rollerine (Admin, Montajcı, Üretimci) göre özelleştirilmiş arayüzler ve yetkilendirmeler sunarak, üretim sürecinin her aşamasının verimli bir şekilde yönetilmesini hedefler. API tabanlı mimarisi sayesinde, gelecekte farklı platformlarla entegrasyon potansiyeline sahiptir.
+Sistem, farklı kullanıcı rollerine (Yönetici, Montajcı, Üretimci) göre özelleştirilmiş arayüzler ve yetkilendirmeler sunarak, üretim sürecinin her aşamasının verimli bir şekilde yönetilmesini hedefler. API tabanlı mimarisi sayesinde, gelecekte farklı platformlarla entegrasyon potansiyeline sahiptir.
 
 Proje, modern web teknolojileri ve en iyi pratikler göz önünde bulundurularak geliştirilmiş olup, özellikle server-side DataTable entegrasyonu, yumuşak silme (soft delete) mekanizmaları, otomatik seri numarası üretimi ve rol bazlı yetkilendirme gibi özelliklerle donatılmıştır.
 
@@ -14,6 +14,7 @@ Proje, modern web teknolojileri ve en iyi pratikler göz önünde bulundurularak
 
 Projenin geliştirilmesinde aşağıdaki teknolojiler ve kütüphaneler kullanılmıştır:
 
+- **Proje Docker uyumlu hale getirilmiştir. Tar yedeği proje içerisinde, aynı zamanda docker hub'da yüklenmiştir.**
 - **Backend:**
   - Python 3.12+
   - Django 5.2+
@@ -41,7 +42,7 @@ Projenin geliştirilmesinde aşağıdaki teknolojiler ve kütüphaneler kullanı
 
 ## Proje Özellikleri ve Uygulama İsterlerinin Karşılanması
 
-Bu bölümde, "Uygulama İsterleri" ve "Ekstralar (Bonus)" başlıkları altında belirtilen maddelerin projede nasıl hayata geçirildiği detaylandırılmaktadır.
+Bu bölümde, "Uygulama İsterleri" ve "Ekstralar (Bonus)" başlıkları altında belirtilen maddelerin projede nasıl hayata geçirildiği detaylandırılmaktadır. Projenin birim test haricindeki tüm isterleri karşılanmıştır. Screenshots klasöründe her ekranın detaylı fotoğrafı ve açıklaması fotoğraf olarak da paylaşılmıştır.
 
 ### Temel Varlıklar ve Yönetimi
 
@@ -64,7 +65,8 @@ Bu bölümde, "Uygulama İsterleri" ve "Ekstralar (Bonus)" başlıkları altınd
 
     - `aircraft_production_app/templates/aircraft_production_app/login.html` adresinde, Bootstrap ile tasarlanmış bir giriş ekranı bulunmaktadır.
     - Giriş işlemi, jQuery Ajax kullanılarak `/api-token-auth/` (DRF `obtain_auth_token`) API endpoint'ine `POST` isteği ile yapılır. Başarılı girişte alınan token, `localStorage`'da saklanır.
-    - [Resim: Personel Giriş Ekranı Görüntüsü]
+
+![Resim: Personel Giriş Ekranı Görüntüsü](./screenshots/app_0_giris_ekrani.png)
 
 2.  **Personelin Takımı:**
 
@@ -78,7 +80,8 @@ Bu bölümde, "Uygulama İsterleri" ve "Ekstralar (Bonus)" başlıkları altınd
       - [Resim: Parça Üretme Formu (Görsel Uçak Seçimi ile) Görüntüsü]
     - **Listeleme:** Üretimci, `/api/parts/` endpoint'i üzerinden sadece kendi takımının ürettiği parçaları (tüm durumlar dahil, filtreleme imkanıyla) listeleyebilir. Bu liste, frontend'de server-side DataTable ile gösterilir.
     - **Geri Dönüşüm (Yumuşak Silme):** Üretimci, kendi takımının ürettiği ve henüz bir uçağa takılı olmayan (`USED` durumunda olmayan) parçaları "geri dönüştürebilir". Bu işlem, API (`DELETE /api/parts/{id}/`) üzerinden parçanın durumunu `RECYCLED` olarak günceller. Fiziksel silme yapılmaz.
-      - [Resim: Üretimcinin Parça Listesi (DataTable ve Geri Dönüştürme Butonu ile) Görüntüsü]
+
+![Resim: Üretimcinin Parça Listesi (DataTable ve Geri Dönüştürme Butonu ile) Görüntüsü](./screenshots/app_uretimci_3_takimimin_urettigi_parcalar.png)
 
 4.  **Takım Sorumlulukları ve Kısıtlamalar:**
 
@@ -90,7 +93,8 @@ Bu bölümde, "Uygulama İsterleri" ve "Ekstralar (Bonus)" başlıkları altınd
     - Montajcı personel, frontend arayüzündeki "Uçak Montaj" formundan sadece monte edilecek uçak modelini (görsel seçici ile) ve isteğe bağlı olarak bir iş emrini seçer.
     - API (`POST /api/assembly/assemble-aircraft/`), seçilen model için gerekli olan her bir ana parça kategorisinden (Kanat, Gövde, Kuyruk, Aviyonik) `AVAILABLE` (Mevcut) durumda ve uyumlu birer parçayı otomatik olarak bulur (FIFO prensibiyle).
     - Tüm parçalar bulunursa, yeni bir `Aircraft` kaydı oluşturulur. `Aircraft.save()` metodu otomatik olarak seri numarası atar ve kullanılan parçaların durumunu `USED` olarak günceller.
-      - [Resim: Uçak Montaj Formu (Görsel Uçak Seçimi ile) Görüntüsü]
+
+![Resim: Uçak Montaj Formu (Görsel Uçak Seçimi ile) Görüntüsü](./screenshots/app_montajci_5_ucak_uret.png)
 
 6.  **Parça-Uçak Uyumluluğu:**
 
@@ -99,13 +103,16 @@ Bu bölümde, "Uygulama İsterleri" ve "Ekstralar (Bonus)" başlıkları altınd
 7.  **Montaj Takımının Üretilen Uçakları Listelemesi:**
 
     - Montajcı, `/api/aircraft/` endpoint'i üzerinden sadece kendi takımının monte ettiği uçakları (tüm durumlar dahil, filtreleme imkanıyla) listeleyebilir. Bu liste, frontend'de server-side DataTable ile gösterilir.
-      - [Resim: Montajcının Uçak Listesi (DataTable ile) Görüntüsü]
+
+![Resim: Montajcının Uçak Listesi (DataTable ile) Görüntüsü](./screenshots/app_montajci_2_takimin_urettigi_ucaklar.png)
 
 8.  **Envanterde Eksik Parça Uyarısı:**
 
     - `/api/inventory/stock-levels/` API endpoint'i, her bir (Uçak Modeli, Parça Tipi) kombinasyonu için `AVAILABLE` stok sayısını ve eğer bu sayı sıfır ise `warning_zero_stock: true` bilgisini döndürür.
     - Frontend'de bu bilgi kullanılarak, özellikle ana panelde veya stok seviyeleri sayfasında, stoğu bitmiş parçalar için uyarılar gösterilir. Rol bazlı (Admin/Montajcı tümünü, Üretimci kendi kategorisini) uyarı gösterimi yapılır.
-      - [Resim: Stok Seviyeleri Sayfası (Uyarılarla Birlikte) Görüntüsü]
+      [Resim: Stok Seviyeleri Sayfası (Uyarılarla Birlikte) Görüntüsü](./screenshots/app_admin_5_parca_ucak_stok_izle.png)
+
+![Resim: Ana Ekranda Stok Seviyeleri Uyarısı](./screenshots/app_admin_1_anasayfa.png)
 
 9.  **Parça Kullanım ve Stok Azaltma:**
 
@@ -138,8 +145,8 @@ Projeyi lokal makinenizde kurmak ve çalıştırmak için aşağıdaki adımlar�
 1.  **Depoyu Klonlayın:**
 
     ```bash
-    git clone <proje_github_url>
-    cd <proje_klasor_adi>
+    git clone https://github.com/isikmuhamm/uav-production-software
+    cd uav-production-software
     ```
 
 2.  **Sanal Ortam Oluşturun ve Aktifleştirin:**
@@ -211,10 +218,16 @@ Projeyi lokal makinenizde kurmak ve çalıştırmak için aşağıdaki adımlar�
     ```
 
 9.  **Uygulamaya Erişin:**
+
     - **Personel Arayüzü (Giriş):** `http://127.0.0.1:8000/app/login/`
     - **Django Admin Paneli:** `http://127.0.0.1:8000/admin/`
     - **API Dokümantasyonu (Swagger UI):** `http://127.0.0.1:8000/api/schema/swagger-ui/`
     - **API Dokümantasyonu (ReDoc):** `http://127.0.0.1:8000/api/schema/redoc/`
+
+10. **Docker ile isikmuhamm/uav-production-app:latest paketini internetten çekerek çalıştırın:**
+    ```bash
+    docker pull isikmuhamm/uav-production-app:latest
+    ```
 
 ## API Endpoint'lerine Genel Bakış
 
@@ -232,6 +245,149 @@ Proje, aşağıdaki ana API endpoint'lerini sunmaktadır (Detaylar için Swagger
 - `/api/assembly/assemble-aircraft/` (POST - Montajcı yetkili): Otomatik parça atama ile uçak montajı.
 - `/api/inventory/stock-levels/` (GET): Rol bazlı parça ve uçak stok seviyelerini listeleme.
 
+## Projenin Geliştirilme Adımları, Proje Gereksinimlerin Tamamlanma Durumu
+
+### I. Temel Altyapı ve Veritabanı
+
+- [x] Django projesi ve `aircraft_production_app` uygulaması oluşturuldu.
+- [x] PostgreSQL veritabanı entegrasyonu tamamlandı.
+- [x] Ortam değişkenleri için `.env` dosyası kullanıldı.
+- [x] Gerekli kütüphaneler (`Django Rest Framework`, `django-filter`, `drf-spectacular` vb.) kuruldu.
+
+### II. Model Tanımlamaları ve İş Mantığı
+
+- [x] **Sabit Tipler:**
+  - [x] Uçak Modelleri (TB2, TB3, AKINCI, KIZILELMA) enum ile tanımlandı ve data migration ile eklendi.
+  - [x] Parça Kategorileri (Kanat, Gövde, Kuyruk, Aviyonik) enum ile tanımlandı ve data migration ile eklendi.
+  - [x] Takım Tipleri (Kanat, Gövde, Kuyruk, Aviyonik, Montaj) enum ile tanımlandı.
+- [x] **Ana Modeller:**
+  - [x] `Team`: Adı ve sabit tiplerden seçilen takım tipi.
+  - [x] `Personnel`: Django User ile birebir ilişkili, bir takıma bağlı.
+  - [x] `PartType`: Sabit parça kategorilerini temsil eder.
+  - [x] `AircraftModel`: Sabit uçak modellerini temsil eder.
+  - [x] `WorkOrder`: İş emirleri, uçak modeli, miktar, durum, oluşturan admin, atanan montaj takımı.
+  - [x] `Part`: Üretilmiş tekil parçalar; seri no, parça tipi, uyumlu model, üreten takım/personel, durum.
+  - [x] `Aircraft`: Monte edilmiş uçaklar; seri no, model, montaj takımı/personeli, durum, kullanılan parçalar (OneToOne).
+- [x] **Otomatik İşlemler:**
+  - [x] `Part` ve `Aircraft` için otomatik ve benzersiz seri numarası üretimi.
+  - [x] Uçak montajında/sökümünde `Part` durumlarının (`USED`/`AVAILABLE`) otomatik güncellenmesi.
+  - [x] İş emri durumunun (`PENDING`/`ASSIGNED`/`IN_PROGRESS`/`COMPLETED`) otomatik güncellenmesi (sinyallerle).
+- [x] **Veri Bütünlüğü:**
+  - [x] Modellerde `clean()` metotları ile iş kuralları ve veri doğrulama.
+  - [x] Takımların kendi sorumluluğundaki parçaları üretebilmesi, montaj takımının parça üretememesi.
+  - [x] Parça-uçak modeli uyumluluk kontrolleri.
+  - [x] Üretim için takımda personel varlığı kontrolü.
+- [x] **Yumuşak Silme (Soft Delete):**
+  - [x] `Part` silindiğinde durumu `RECYCLED` olur.
+  - [x] `WorkOrder` silindiğinde durumu `CANCELLED` olur, uçak bağlantıları kesilir.
+  - [x] `Aircraft` silindiğinde durumu `RECYCLED` olur, parça bağlantıları kesilir, parçalar `AVAILABLE` olur.
+- [x] **Kayıt Bilgileri:**
+  - [x] Parça ve Uçak kayıtlarında oluşturan/montaj yapan personel ve oluşturma/güncelleme tarihleri.
+
+### III. Django Admin Paneli
+
+- [x] Tüm modeller admin paneline kaydedildi ve yönetilebilir durumda.
+- [x] Liste görünümleri, filtreler, arama alanları özelleştirildi.
+- [x] İlişkili veriler (örn: takımdaki personel sayısı) gösteriliyor.
+- [x] Sabit tipler (Uçak Modeli, Parça Tipi) için ekleme/değiştirme/silme kısıtlandı.
+- [x] Otomatik alan atamaları (örn: `WorkOrder.created_by`) ve yumuşak silme işlemleri admin panelinden de çalışıyor.
+
+### IV. API Geliştirme (Django Rest Framework)
+
+- [x] **Kimlik Doğrulama:** Token tabanlı giriş (`/api-token-auth/`) ve kullanıcı bilgisi (`/api/user/me/`) endpoint'leri.
+- [x] **Serializer'lar:** Tüm ana modeller için detaylı serializer'lar.
+- [x] **ViewSet'ler ve APIView'lar:**
+  - [x] Sabit veriler (`AircraftModel`, `PartType`) için salt okunur listeleme.
+  - [x] `Team`, `Personnel` için Admin CRUD yetkili API'ler.
+  - [x] `WorkOrderViewSet`: Admin CRUD, Montajcı belirli iş emirlerini listeler.
+  - [x] `PartViewSet`: Üretimci parça üretir/listeler/geri dönüştürür; Montajcı mevcut parçaları listeler.
+  - [x] `AircraftViewSet`: Admin CRUD; Montajcı kendi uçaklarını listeler/geri dönüştürür.
+  - [x] `AssembleAircraftAPIView`: Montajcı için otomatik parça atama ile uçak montajı.
+  - [x] `stock_levels_api_view`: Rol bazlı parça ve uçak stoklarını listeler, sıfır stok uyarısı verir.
+- [x] **İzinler (Permissions):** Rol bazlı erişim kontrolü için özel izin sınıfları.
+- [x] **Filtreleme, Sıralama, Arama:** `django-filter`, `OrderingFilter`, `SearchFilter` ile API'lere eklendi.
+- [x] **Pagination:** Özel `StandardDataTablePagination` ile DataTable uyumlu API cevapları.
+- [x] **API Dokümantasyonu (Swagger/ReDoc):** `drf-spectacular` ile `/api/schema/swagger-ui/` ve `/api/schema/redoc/` adreslerinde otomatik dokümantasyon.
+
+### V. Frontend (Django Templates + jQuery/Ajax)
+
+- [x] Temel HTML şablon yapısı (`base.html`, `login.html`, `dashboard_admin.html`).
+- [x] Statik dosyalar (`main.js`) ve global JavaScript değişkenleri ayarlandı.
+- [x] Personel giriş/çıkış işlevselliği API'ye bağlandı.
+- [x] Dashboard'da rol bazlı menü ve temel içerik alanlarının gösterimi/gizlenmesi.
+- [x] **İş Emirleri Listeleme (Admin):** Server-side DataTable ile entegre edildi (sayfalandırma, arama, sıralama, durum filtresi çalışıyor).
+- [x] **Görsel Uçak Seçimi:** Formlarda (İş Emri, Parça Üret, Uçak Montaj) tıklanabilir resimlerle uçak modeli seçimi.
+- [x] **Formlar:** Yeni İş Emri, Parça Üret, Uçak Montaj formları Ajax ile API'ye bağlanıyor, çift istek sorunları çözüldü.
+- [x] **Stok Seviyeleri:** API'den veri çekilip gösteriliyor (gösterim iyileştirmesi yapılacak).
+
+### VI. Ekstralar (Bonus)
+
+- [x] Server-Side DataTable Kullanılması (İş Emirleri için tamamlandı, diğerleri için planlandı).
+- [x] Ön Yüzde Asenkron (Ajax, Fetch vs.) Yapı Kullanılması.
+- [x] İlişkisel Tabloların Ayrı Ayrı Tutulması.
+- [x] Django İçin Ekstra Kütüphaneler Kullanılması (`django-filter`, `drf-spectacular`).
+- [x] Ön Yüzde (Front-End) Bootstrap, Jquery Kullanılması.
+- [x] API Docs (Swagger).
+- [x] Projenin Docker ile Ayağa Kalkması.
+- [x] İyi Hazırlanmış Dokümantasyon ve Yorum Satırları (Bu README ve kod içi yorumlarla devam ediyor).
+- [ ] Birim Testi.
+- [x] Listeleme sayfaları için datatable kullanılması (İş emirleri için tamam, diğerlerine yaygınlaştırılacak).
+
+## Projeni Tüm Fotoğrafları
+
+### Yöneticinin gördüğü django database yönetim ekranları
+
+![Resim: admin_1_aracmodelleri_ontanimli_degismez](./screenshots/admin_1_aracmodelleri_ontanimli_degismez.png)
+![Resim: admin_2_parcatipleri_ontanimli_degismez](./screenshots/admin_2_parcatipleri_ontanimli_degismez.png)
+![Resim: admin_3_personelleri_kullaniciya_ve_takima_atama_1](./screenshots/admin_3_personelleri_kullaniciya_ve_takima_atama_1.png)
+![Resim: admin_3_personelleri_kullaniciya_ve_takima_atama_2](./screenshots/admin_3_personelleri_kullaniciya_ve_takima_atama_2.png)
+![Resim: admin_4_takim_olusturma_ve_yetkilendirme_1](./screenshots/admin_4_takim_olusturma_ve_yetkilendirme_1.png)
+![Resim: admin_5_uretilmis_hava_araclari_uretme_duzenleme_1](./screenshots/admin_5_uretilmis_hava_araclari_uretme_duzenleme_1.png)
+![Resim: admin_5_uretilmis_hava_araclari_uretme_duzenleme_2](./screenshots/admin_5_uretilmis_hava_araclari_uretme_duzenleme_2.png)
+![Resim: admin_6_uretilmis_parcalar_uretme_duzenleme_1](./screenshots/admin_6_uretilmis_parcalar_uretme_duzenleme_1.png)
+![Resim: admin_6_uretilmis_parcalar_uretme_duzenleme_2](./screenshots/admin_6_uretilmis_parcalar_uretme_duzenleme_2.png)
+![Resim: admin_7_is_emri_olustur_duzenle_1](./screenshots/admin_7_is_emri_olustur_duzenle_1.png)
+![Resim: admin_7_is_emri_olustur_duzenle_2](./screenshots/admin_7_is_emri_olustur_duzenle_2.png)
+
+### Giriş ve Kayıt Ekranları
+
+![Resim: app_0_giris_ekrani](./screenshots/app_0_giris_ekrani.png)
+![Resim: app_1_kayit_ekrani](./screenshots/app_1_kayit_ekrani.png)
+
+### Uygulama yönetici paneli
+
+![Resim: app_admin_1_anasayfa](./screenshots/app_admin_1_anasayfa.png)
+![Resim: app_admin_2_isemri_olustur_duzenle_sil](./screenshots/app_admin_2_isemri_olustur_duzenle_sil.png)
+![Resim: app_admin_3_ucak_goruntule_sil](./screenshots/app_admin_3_ucak_goruntule_sil.png)
+![Resim: app_admin_4_parca_goruntule_sil](./screenshots/app_admin_4_parca_goruntule_sil.png)
+![Resim: app_admin_5_parca_ucak_stok_izle](./screenshots/app_admin_5_parca_ucak_stok_izle.png)
+![Resim: app_admin_6_personel_listele_takim_ayarla_sil](./screenshots/app_admin_6_personel_listele_takim_ayarla_sil.png)
+![Resim: app_admin_7_takim_ekle_gorev_degistir_sil](./screenshots/app_admin_7_takim_ekle_gorev_degistir_sil.png)
+
+### Uygulama montajcı paneli
+
+![Resim: app_montajci_1_anasayfa](./screenshots/app_montajci_1_anasayfa.png)
+![Resim: app_montajci_2_takimin_urettigi_ucaklar](./screenshots/app_montajci_2_takimin_urettigi_ucaklar.png)
+![Resim: app_montajci_3_parca_goruntule_sil](./screenshots/app_montajci_3_parca_goruntule_sil.png)
+![Resim: app_montajci_4_kendi_takimina_atanmis_isler](./screenshots/app_montajci_4_kendi_takimina_atanmis_isler.png)
+![Resim: app_montajci_5_ucak_uret](./screenshots/app_montajci_5_ucak_uret.png)
+![Resim: app_montajci_6_parca_ucak_stok_izle](./screenshots/app_montajci_6_parca_ucak_stok_izle.png)
+
+### Uygulama üretimci paneli
+
+![Resim: app_uretimci_1_anasayfa](./screenshots/app_uretimci_1_anasayfa.png)
+![Resim: app_uretimci_2_parca_uretme_api_korumali_kendine_ait_olmayani_uretemez](./screenshots/app_uretimci_2_parca_uretme_api_korumali_kendine_ait_olmayani_uretemez.png)
+![Resim: app_uretimci_3_takimimin_urettigi_parcalar](./screenshots/app_uretimci_3_takimimin_urettigi_parcalar.png)
+![Resim: app_uretimci_4_kendi_alanimin_stok_seviyeleri](./screenshots/app_uretimci_4_kendi_alanimin_stok_seviyeleri.png)
+![Resim: app_personel_1_sadece_parca_stok_gorebilir](./screenshots/app_personel_1_sadece_parca_stok_gorebilir.png)
+
+### Database ilişkileri, postman, swagger, dokumantasyon
+
+![Resim: database_relations](./screenshots/database_relations.png)
+![Resim: postman_sample_api_list_screen](./screenshots/postman_sample_api_list_screen.png)
+![Resim: swagger_ui_redoc](./screenshots/swagger_ui_redoc.png)
+![Resim: swagger_ui_schema](./screenshots/swagger_ui_schema.png)
+
 ## Katkıda Bulunma
 
 Bu proje bir case study olarak geliştirilmiş olup, şu an için aktif katkı kabul etmemektedir. Ancak, olası iyileştirme önerileri veya hata bildirimleri için GitHub Issues bölümünü kullanabilirsiniz.
@@ -241,7 +397,3 @@ Eğer projeyi fork'layıp kendi geliştirmelerinizi yapmak isterseniz, standart 
 ## Lisans
 
 Bu proje için bir lisans belirtilmemiştir.
-
----
-
-Umarım bu README dosyası, projenizi başarılı bir şekilde sunmanıza yardımcı olur! Başarılar dilerim.

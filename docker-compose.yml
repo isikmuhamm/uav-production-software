@@ -15,6 +15,7 @@ services:
 
   web:
     build: . # Proje dizinindeki Dockerfile'ı kullanarak imaj oluştur
+    image: isikmuhamm/uav-production-app:latest # Docker Hub için imaj adı
     container_name: hava_araci_uretim_web_container
     command: /app/entrypoint.sh # Konteyner başladığında bu script çalışacak
     volumes:
