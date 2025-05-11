@@ -1,9 +1,17 @@
+/**
+ * Yeni kullanıcı kaydı işlemleri için event handler ve AJAX fonksiyonları.
+ */
 $(document).ready(function() {
+    /**
+     * Kayıt formunun submit olayını dinler ve AJAX ile API'ye gönderir.
+     * @param {Event} event - Form gönderim olayı
+     */
     $('#registerForm').on('submit', function(event) {
         event.preventDefault();
+
         const $form = $(this);
         const $button = $('#registerButton');
-        const originalButtonText = $button.html();
+        const originalText = $button.html();
         const $alerts = $('#registerAlerts');
 
         $alerts.empty().removeClass('alert alert-danger alert-success');
@@ -16,46 +24,40 @@ $(document).ready(function() {
             password2: $('#regPassword2').val()
         };
 
-        // CSRF token'ı header'a eklemek için getCookie fonksiyonuna ihtiyacımız var.
-        // Bu fonksiyon main.js'de tanımlı. Eğer bu dosya main.js'den sonra yükleniyorsa erişilebilir.
-        // Ya da burada tekrar tanımlanabilir veya base.html'de global bir değişkene atanabilir.
-        // Şimdilik makeApiRequest benzeri bir yapı kullanmayıp doğrudan $.ajax kullanıyoruz.
-        // CSRF token'ı formdan da alabiliriz: const csrfToken = $form.find('input[name="csrfmiddlewaretoken"]').val();
-
+        /**
+         * @description API_REGISTER_URL ile POST isteği atarak kullanıcı kaydı oluşturur.
+         * API'den başarılı yanıt alındığında kullanıcıya bilgi mesajı gösterir.
+         */
         $.ajax({
-            url: API_REGISTER_URL, // Bu değişken register.html'de tanımlanmalı
+            url: typeof API_REGISTER_URL !== 'undefined' ? API_REGISTER_URL : '/register/',
             method: 'POST',
             data: JSON.stringify(formData),
             contentType: 'application/json; charset=utf-8',
-            // headers: { 'X-CSRFToken': getCookie('csrftoken') }, // Eğer CSRF koruması API'de aktifse
             success: function(response) {
-                $button.prop('disabled', false).html(originalButtonText);
-                $alerts.html(response.message || 'Kayıt başarılı! Lütfen giriş yapın.').addClass('alert alert-success').show();
+                $button.prop('disabled', false).html(originalText);
+                $alerts.html(response.message || 'Kayıt başarılı!').addClass('alert alert-success').show();
                 $form[0].reset();
-                // İsteğe bağlı: Kullanıcıyı birkaç saniye sonra giriş sayfasına yönlendir
                 setTimeout(function() {
-                    if (typeof LOGIN_URL !== 'undefined') { // LOGIN_URL register.html'de tanımlanmalı
+                    if (typeof LOGIN_URL !== 'undefined') {
                         window.location.href = LOGIN_URL;
                     }
                 }, 3000);
             },
             error: function(xhr) {
-                $button.prop('disabled', false).html(originalButtonText);
-                let errorMessage = 'Kayıt sırasında bir hata oluştu.';
+                $button.prop('disabled', false).html(originalText);
+                let errorMsg = 'Kayıt sırasında bir hata oluştu.';
                 if (xhr.responseJSON) {
-                    errorMessage = Object.entries(xhr.responseJSON).map(([key, value]) => {
-                        let fieldError = Array.isArray(value) ? value.join(', ') : value;
-                        // Alan adlarını daha kullanıcı dostu hale getirebiliriz
-                        let fieldName = key;
-                        if (key === 'username') fieldName = 'Kullanıcı Adı';
-                        else if (key === 'email') fieldName = 'E-posta';
-                        else if (key === 'password') fieldName = 'Şifre';
-                        else if (key === 'password2') fieldName = 'Şifre Tekrar';
-                        else if (key === 'non_field_errors') return fieldError;
-                        return `${fieldName}: ${fieldError}`;
+                    errorMsg = Object.entries(xhr.responseJSON).map(([field, value]) => {
+                        let translatedField = field;
+                        if (field === 'username') translatedField = 'Kullanıcı Adı';
+                        else if (field === 'email') translatedField = 'E-posta';
+                        else if (field === 'password') translatedField = 'Şifre';
+                        else if (field === 'password2') translatedField = 'Şifre Tekrar';
+                        else if (field === 'non_field_errors') return value;
+                        return `${translatedField}: ${Array.isArray(value) ? value.join(', ') : value}`;
                     }).join('<br>');
                 }
-                $alerts.html(errorMessage).addClass('alert alert-danger').show();
+                $alerts.html(errorMsg).addClass('alert alert-danger').show();
             }
         });
     });

@@ -1,108 +1,165 @@
 from rest_framework import serializers
 from .models import (
-    AircraftModel, PartType, Team, Personnel, User, # User modelini de import edelim
-    WorkOrder, Part, Aircraft, # İleride kullanacağımız diğer modeller
-    DefinedTeamTypes, PartCategory, AircraftModelChoices, # Enum'lar
+    AircraftModel, PartType, Team, Personnel, User,
+    WorkOrder, Part, Aircraft,
+    DefinedTeamTypes, PartCategory, AircraftModelChoices,
     WorkOrderStatusChoices, PartStatusChoices, AircraftStatusChoices
 )
 
 class AircraftModelSerializer(serializers.ModelSerializer):
     """
-    Hava Aracı Modelleri için Serializer.
-    Sabit verileri listelemek için kullanılacak.
+    AircraftModel modelini okuma amaçlı serileştirir.
+    Kullanan View: AircraftModelViewSet (vs.)
     """
-    # 'name' alanı choices kullandığı için, 'get_name_display' ile okunabilir etiketini de gönderiyoruz.
-    name_display = serializers.CharField(source='get_name_display', read_only=True)
+    name_display = serializers.CharField(
+        source='get_name_display',
+        read_only=True,
+        help_text="Model adının okunabilir sürümü."
+    )
 
     class Meta:
         model = AircraftModel
         fields = ['id', 'name', 'name_display', 'image_filename', 'image_url']
-        read_only_fields = fields # Bu serializer sadece okuma amaçlı olacak
+        read_only_fields = fields
 
 class PartTypeSerializer(serializers.ModelSerializer):
     """
-    Parça Tipleri (Kategorileri) için Serializer.
-    Sabit verileri listelemek için kullanılacak.
+    PartType modelini okuma amaçlı serileştirir.
     """
-    # 'category' alanı choices kullandığı için, 'get_category_display' ile okunabilir etiketini de gönderiyoruz.
-    category_display = serializers.CharField(source='get_category_display', read_only=True)
+    category_display = serializers.CharField(
+        source='get_category_display',
+        read_only=True,
+        help_text="Parça kategorisinin okunabilir sürümü."
+    )
 
     class Meta:
         model = PartType
         fields = ['id', 'category', 'category_display']
-        read_only_fields = fields # Bu serializer sadece okuma amaçlı olacak
-
-
-
-
-# --- İlerleyen adımlarda detaylandırılacak diğer serializer'lar için taslaklar ---
+        read_only_fields = fields
 
 class UserSerializer(serializers.ModelSerializer):
     """
-    Django User modeli için basit bir serializer.
+    User modelini temel alan alanları sergileyen serializer.
     """
     class Meta:
         model = User
         fields = ['id', 'username', 'first_name', 'last_name', 'email']
 
-
 class PersonnelSerializer(serializers.ModelSerializer):
     """
-    Personel modeli için serializer.
+    Personnel modelini serileştirir ve Personelin takım/user bilgilerini yönetir.
     """
-    # user alanı, Personnel modelinde User'a OneToOneField ve primary_key=True olduğu için
-    # bu alan zaten User'ın ID'sini temsil eder ve PersonnelViewSet'te lookup_field olarak kullanılabilir.
-    # Okuma sırasında User bilgilerini göstermek için aşağıdaki alanları ekliyoruz.
-    user_username = serializers.CharField(source='user.username', read_only=True)
-    user_email = serializers.EmailField(source='user.email', read_only=True)
-
-    team_name = serializers.CharField(source='team.name', read_only=True, allow_null=True)
-    team_type = serializers.CharField(source='team.team_type', read_only=True, allow_null=True) # Enum key (örn: ASSEMBLY_TEAM)
-    team_type_display = serializers.CharField(source='team.get_team_type_display', read_only=True, allow_null=True) # Okunabilir etiket
-
-    # Takım atama/güncelleme için sadece ID'yi alacağız.
-    team = serializers.PrimaryKeyRelatedField(queryset=Team.objects.all(), allow_null=True, required=False)
+    user_username = serializers.CharField(
+        source='user.username',
+        read_only=True,
+        help_text="Personel ile ilişkili kullanıcının kullanıcı adı."
+    )
+    user_email = serializers.EmailField(
+        source='user.email',
+        read_only=True,
+        help_text="Personel ile ilişkili kullanıcının e-posta adresi."
+    )
+    team_name = serializers.CharField(
+        source='team.name',
+        read_only=True,
+        allow_null=True,
+        help_text="Personelin dahil olduğu takımın adı (isteğe bağlı)."
+    )
+    team_type = serializers.CharField(
+        source='team.team_type',
+        read_only=True,
+        allow_null=True,
+        help_text="Takım tipi (ör. ASSEMBLY_TEAM)."
+    )
+    team_type_display = serializers.CharField(
+        source='team.get_team_type_display',
+        read_only=True,
+        allow_null=True,
+        help_text="Takım tipinin okunabilir sürümü."
+    )
+    team = serializers.PrimaryKeyRelatedField(
+        queryset=Team.objects.all(),
+        allow_null=True,
+        required=False,
+        help_text="Takım ID'si."
+    )
 
     class Meta:
         model = Personnel
-        fields = ['user', 'user_username', 'user_email', 'team', 'team_name', 'team_type', 'team_type_display']
-        read_only_fields = ['user', 'user_username', 'user_email', 'team_name', 'team_type', 'team_type_display']
-
+        fields = [
+            'user', 'user_username', 'user_email', 'team',
+            'team_name', 'team_type', 'team_type_display'
+        ]
+        read_only_fields = [
+            'user', 'user_username', 'user_email',
+            'team_name', 'team_type', 'team_type_display'
+        ]
 
 class TeamSerializer(serializers.ModelSerializer):
     """
-    Takım modeli için serializer.
+    Team modelini serileştirir ve takım bilgilerini gösterir.
     """
-    team_type_display = serializers.CharField(source='get_team_type_display', read_only=True)
-    personnel_count = serializers.IntegerField(read_only=True) # Modeldeki metodu kullan
-    # display_personnel_names metodu çok uzun olabileceği için API'de doğrudan kullanmak yerine
-    # personellere ayrı bir endpoint üzerinden erişim sağlamak daha iyi olabilir.
+    team_type_display = serializers.CharField(
+        source='get_team_type_display',
+        read_only=True,
+        help_text="Takım tipinin okunabilir sürümü (ör. Montaj Takımı)."
+    )
+    personnel_count = serializers.IntegerField(
+        read_only=True,
+        help_text="Takımda bulunan personel sayısı."
+    )
 
     class Meta:
         model = Team
-        fields = ['id', 'name', 'team_type', 'team_type_display', 'can_perform_assembly', 'personnel_count']
-
-
-
-
+        fields = [
+            'id', 'name', 'team_type', 'team_type_display',
+            'can_perform_assembly', 'personnel_count'
+        ]
 
 class PartSerializer(serializers.ModelSerializer):
-    part_type_display = serializers.CharField(source='part_type.get_category_display', read_only=True)
-    aircraft_model_compatibility_name = serializers.CharField(source='aircraft_model_compatibility.get_name_display', read_only=True)
-    produced_by_team_name = serializers.CharField(source='produced_by_team.name', read_only=True)
-    status_display = serializers.CharField(source='get_status_display', read_only=True)
-    created_by_personnel_username = serializers.CharField(source='created_by_personnel.user.username', read_only=True, allow_null=True)
-    installed_aircraft_info = serializers.CharField(source='get_installed_aircraft_info', read_only=True) # Modeldeki metodu kullan
-
-    # Üretimci parça oluştururken sadece aircraft_model_compatibility'yi gönderecek.
-    aircraft_model_compatibility = serializers.PrimaryKeyRelatedField(queryset=AircraftModel.objects.all())
-    # Diğerleri (part_type, produced_by_team, created_by_personnel) perform_create içinde atanacak.
+    """
+    Part modelini serileştirir ve parça bilgilerini yönetir.
+    """
+    part_type_display = serializers.CharField(
+        source='part_type.get_category_display',
+        read_only=True,
+        help_text="Parça tipinin okunabilir kategorisi."
+    )
+    aircraft_model_compatibility_name = serializers.CharField(
+        source='aircraft_model_compatibility.get_name_display',
+        read_only=True,
+        help_text="Parçanın uyumlu olduğu hava aracı modelinin adı."
+    )
+    produced_by_team_name = serializers.CharField(
+        source='produced_by_team.name',
+        read_only=True,
+        help_text="Parçayı üreten takımın adı."
+    )
+    status_display = serializers.CharField(
+        source='get_status_display',
+        read_only=True,
+        help_text="Parçanın durumunun okunabilir sürümü."
+    )
+    created_by_personnel_username = serializers.CharField(
+        source='created_by_personnel.user.username',
+        read_only=True,
+        allow_null=True,
+        help_text="Parçayı oluşturan personelin kullanıcı adı."
+    )
+    installed_aircraft_info = serializers.CharField(
+        source='get_installed_aircraft_info',
+        read_only=True,
+        help_text="Parçanın monte edildiği hava aracı bilgisi."
+    )
+    aircraft_model_compatibility = serializers.PrimaryKeyRelatedField(
+        queryset=AircraftModel.objects.all(),
+        help_text="Parçanın uyumlu olduğu hava aracı modeli ID'si."
+    )
 
     class Meta:
         model = Part
         fields = [
-            'id', 'serial_number',
-            'part_type', 'part_type_display',
+            'id', 'serial_number', 'part_type', 'part_type_display',
             'aircraft_model_compatibility', 'aircraft_model_compatibility_name',
             'produced_by_team', 'produced_by_team_name',
             'created_by_personnel', 'created_by_personnel_username',
@@ -115,20 +172,37 @@ class PartSerializer(serializers.ModelSerializer):
             'part_type_display', 'aircraft_model_compatibility_name',
             'produced_by_team_name', 'status_display', 'created_by_personnel_username',
             'installed_aircraft_info',
-            'part_type', 'produced_by_team', 'created_by_personnel', 'status' # Bunlar otomatik veya kontrollü atanacak
+            'part_type', 'produced_by_team', 'created_by_personnel', 'status'
         ]
 
-class AircraftAssemblySerializer(serializers.Serializer): # Bu zaten vardı
-    aircraft_model_id = serializers.IntegerField(write_only=True, help_text="Monte edilecek AircraftModel ID'si")
-    work_order_id = serializers.IntegerField(required=False, allow_null=True, write_only=True, help_text="İsteğe bağlı, montajın yapılacağı WorkOrder ID'si")
+class AircraftAssemblySerializer(serializers.Serializer):
+    """
+    AircraftModel ID'si vb. alarak Hava Aracı montajını yönetmek için kullanılan serializer.
+    """
+    aircraft_model_id = serializers.IntegerField(
+        write_only=True,
+        help_text="Monte edilecek AircraftModel ID'si."
+    )
+    work_order_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        write_only=True,
+        help_text="İsteğe bağlı, montajın yapılacağı WorkOrder ID'si."
+    )
 
     def validate_aircraft_model_id(self, value):
+        """
+        Model ID geçerliliğini kontrol eder.
+        """
         if not AircraftModel.objects.filter(id=value).exists():
             raise serializers.ValidationError("Geçersiz Hava Aracı Modeli ID'si.")
         return value
 
     def validate_work_order_id(self, value):
-        if value: # Sadece ID gönderilmişse kontrol et
+        """
+        İş emrinin montaj için uygun olup olmadığını kontrol eder.
+        """
+        if value:
             try:
                 work_order = WorkOrder.objects.get(id=value)
                 if work_order.status in [WorkOrderStatusChoices.COMPLETED, WorkOrderStatusChoices.CANCELLED]:
@@ -137,23 +211,68 @@ class AircraftAssemblySerializer(serializers.Serializer): # Bu zaten vardı
                 raise serializers.ValidationError("Geçersiz İş Emri ID'si.")
         return value
 
-
 class AircraftSerializer(serializers.ModelSerializer):
-    aircraft_model_name = serializers.CharField(source='aircraft_model.get_name_display', read_only=True)
-    assembled_by_team_name = serializers.CharField(source='assembled_by_team.name', read_only=True, allow_null=True)
-    assembled_by_personnel_username = serializers.CharField(source='assembled_by_personnel.user.username', read_only=True, allow_null=True)
-    work_order_info = serializers.CharField(source='work_order.__str__', read_only=True, allow_null=True)
-    status_display = serializers.CharField(source='get_status_display', read_only=True)
-
-    wing_sn = serializers.CharField(source='wing.serial_number', read_only=True, allow_null=True)
-    fuselage_sn = serializers.CharField(source='fuselage.serial_number', read_only=True, allow_null=True)
-    tail_sn = serializers.CharField(source='tail.serial_number', read_only=True, allow_null=True)
-    avionics_sn = serializers.CharField(source='avionics.serial_number', read_only=True, allow_null=True)
+    """
+    Aircraft modelini serileştirir ve montaj durumunu gösterir.
+    """
+    aircraft_model_name = serializers.CharField(
+        source='aircraft_model.get_name_display',
+        read_only=True,
+        help_text="Hava aracının modeli (okunabilir)."
+    )
+    assembled_by_team_name = serializers.CharField(
+        source='assembled_by_team.name',
+        read_only=True,
+        allow_null=True,
+        help_text="Montajı yapan takımın adı."
+    )
+    assembled_by_personnel_username = serializers.CharField(
+        source='assembled_by_personnel.user.username',
+        read_only=True,
+        allow_null=True,
+        help_text="Montajı yapan personelin kullanıcı adı."
+    )
+    work_order_info = serializers.CharField(
+        source='work_order.__str__',
+        read_only=True,
+        allow_null=True,
+        help_text="İlgili iş emri bilgisi."
+    )
+    status_display = serializers.CharField(
+        source='get_status_display',
+        read_only=True,
+        help_text="Hava aracının durumunun okunabilir sürümü."
+    )
+    wing_sn = serializers.CharField(
+        source='wing.serial_number',
+        read_only=True,
+        allow_null=True,
+        help_text="Kanat parçasının seri numarası."
+    )
+    fuselage_sn = serializers.CharField(
+        source='fuselage.serial_number',
+        read_only=True,
+        allow_null=True,
+        help_text="Gövde parçasının seri numarası."
+    )
+    tail_sn = serializers.CharField(
+        source='tail.serial_number',
+        read_only=True,
+        allow_null=True,
+        help_text="Kuyruk parçasının seri numarası."
+    )
+    avionics_sn = serializers.CharField(
+        source='avionics.serial_number',
+        read_only=True,
+        allow_null=True,
+        help_text="Aviyonik parçasının seri numarası."
+    )
 
     class Meta:
         model = Aircraft
         fields = [
-            'id', 'serial_number', 'aircraft_model', 'aircraft_model_name', 'status', 'status_display',
+            'id', 'serial_number', 'aircraft_model', 'aircraft_model_name',
+            'status', 'status_display',
             'assembly_date', 'updated_at',
             'assembled_by_team', 'assembled_by_team_name',
             'assembled_by_personnel', 'assembled_by_personnel_username',
@@ -166,34 +285,48 @@ class AircraftSerializer(serializers.ModelSerializer):
             'aircraft_model_name', 'assembled_by_team_name',
             'assembled_by_personnel_username', 'work_order_info', 'status_display',
             'wing_sn', 'fuselage_sn', 'tail_sn', 'avionics_sn',
-            # Uçak montajı özel bir endpoint ile yapıldığı için bu alanlar genelde read-only olur.
             'wing', 'fuselage', 'tail', 'avionics', 'status', 'assembled_by_team', 'assembled_by_personnel'
         ]
 
 class WorkOrderSerializer(serializers.ModelSerializer):
-    aircraft_model_name = serializers.CharField(source='aircraft_model.get_name_display', read_only=True)
-    status_display = serializers.CharField(source='get_status_display', read_only=True)
-    created_by_username = serializers.SerializerMethodField(read_only=True)
-    assigned_to_assembly_team_name = serializers.SerializerMethodField(read_only=True)
-
-
-    # PrimaryKeyRelatedField'ler POST/PUT isteklerinde ID almak için kullanılır.
-    # Modelde null=True, blank=True ise, serializer'da da allow_null=True, required=False olmalı.
-    aircraft_model = serializers.PrimaryKeyRelatedField(queryset=AircraftModel.objects.all())
-    assigned_to_assembly_team = serializers.PrimaryKeyRelatedField(
-        queryset=Team.objects.all(), # Validasyonda montaj takımı olup olmadığını kontrol edeceğiz
-        allow_null=True,
-        required=False
+    """
+    WorkOrder modelini serileştirir ve iş emirlerini yönetir.
+    """
+    aircraft_model_name = serializers.CharField(
+        source='aircraft_model.get_name_display',
+        read_only=True,
+        help_text="İş emri için belirtilen hava aracı modelinin okunabilir adı."
     )
-    # created_by alanı API'den gönderilmeyecek, perform_create içinde otomatik atanacak.
-    # Bu yüzden fields listesinde olabilir ama read_only veya extra_kwargs ile belirtilmeli.
+    status_display = serializers.CharField(
+        source='get_status_display',
+        read_only=True,
+        help_text="İş emrinin durumunun okunabilir sürümü."
+    )
+    created_by_username = serializers.SerializerMethodField(
+        read_only=True,
+        help_text="İş emrini oluşturan kullanıcının kullanıcı adı."
+    )
+    assigned_to_assembly_team_name = serializers.SerializerMethodField(
+        read_only=True,
+        help_text="İş emri için atanan montaj takımının adı."
+    )
+    aircraft_model = serializers.PrimaryKeyRelatedField(
+        queryset=AircraftModel.objects.all(),
+        help_text="İş emri için hava aracı modeli ID'si."
+    )
+    assigned_to_assembly_team = serializers.PrimaryKeyRelatedField(
+        queryset=Team.objects.all(),
+        allow_null=True,
+        required=False,
+        help_text="İş emri için atanan montaj takımı ID'si."
+    )
 
     class Meta:
         model = WorkOrder
         fields = [
             'id', 'aircraft_model', 'aircraft_model_name', 'quantity',
             'status', 'status_display',
-            'created_by', 'created_by_username', # 'created_by' ID'yi, 'created_by_username' kullanıcı adını döndürür
+            'created_by', 'created_by_username',
             'assigned_to_assembly_team', 'assigned_to_assembly_team_name',
             'notes', 'created_at', 'updated_at', 'target_completion_date'
         ]
@@ -201,33 +334,39 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             'id', 'created_at', 'updated_at',
             'aircraft_model_name', 'status_display',
             'created_by_username', 'assigned_to_assembly_team_name',
-            'created_by', # API'den oluşturulurken otomatik atanacağı için read_only
-            'status' # Modelin save() metodu veya admin tarafından yönetiliyor, API'den doğrudan set edilmemeli (şimdilik)
+            'created_by',
+            'status'
         ]
 
-
     def get_created_by_username(self, obj):
+        """Oluşturan kullanıcının adını döndürür."""
         if obj.created_by:
             return obj.created_by.username
         return None
 
     def get_assigned_to_assembly_team_name(self, obj):
+        """İlgili montaj takımının adını döndürür."""
         if obj.assigned_to_assembly_team:
             return obj.assigned_to_assembly_team.name
         return None
 
     def validate_assigned_to_assembly_team(self, value):
+        """
+        Atanan takımın bir montaj takımı olup olmadığını doğrular.
+        """
         if value and value.team_type != DefinedTeamTypes.ASSEMBLY_TEAM:
             raise serializers.ValidationError(f"Seçilen takım '{value.name}' bir montaj takımı değildir.")
         return value
 
     def validate(self, data):
-        # Yeni iş emri oluşturulurken gerekli alan kontrolleri
-        if not self.instance: # Sadece create sırasında
+        """
+        Yeni iş emri oluştururken gerekli alanları ve değerleri doğrular.
+        """
+        if not self.instance:
             if 'aircraft_model' not in data or data.get('aircraft_model') is None:
                 raise serializers.ValidationError({"aircraft_model": "Hava aracı modeli zorunludur."})
             if 'quantity' not in data or data.get('quantity') is None:
-                 raise serializers.ValidationError({"quantity": "Miktar zorunludur."})
+                raise serializers.ValidationError({"quantity": "Miktar zorunludur."})
             elif not isinstance(data.get('quantity'), int) or data.get('quantity') < 1:
                 raise serializers.ValidationError({"quantity": "Miktar pozitif bir tam sayı olmalıdır."})
         return data

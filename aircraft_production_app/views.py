@@ -1,17 +1,17 @@
 from rest_framework.decorators import api_view, permission_classes, authentication_classes, action
 from rest_framework.response import Response
-from rest_framework.views import APIView # APIView'ı import et
-from rest_framework import viewsets, filters, permissions, status as drf_status, serializers # permissions'ı import et
-from django_filters.rest_framework import DjangoFilterBackend # Bunu da import edin
-
+from rest_framework.views import APIView
+from rest_framework import viewsets, filters, permissions, status as drf_status, serializers
+from django_filters.rest_framework import DjangoFilterBackend
+from django.contrib.auth.models import User
 from django.shortcuts import render
 from django.shortcuts import get_object_or_404
-from django.core.exceptions import ValidationError as DjangoValidationError # Django'dan gelen ValidationError
-from django.db import transaction, models # transaction ve models'ı import et
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction, models
 
-from .models import Part, PartType, AircraftModel, Aircraft, Team, Personnel, PartCategory, DefinedTeamTypes, PartStatusChoices, AircraftStatusChoices, WorkOrder, WorkOrderStatusChoices # Modelleri import et
-from .serializers import AircraftModelSerializer, AircraftSerializer, AircraftAssemblySerializer, PartTypeSerializer, TeamSerializer, PersonnelSerializer, PartSerializer, WorkOrderSerializer # Mevcut serializer'lar
-from .permissions import IsAdminOrReadOnly, IsOwnerTeamOrAdminForPart,  IsAssemblyTeamMemberOrAdminForAircraft, CanAssembleAircraft, IsNotAssemblyTeamForCreate
+from .models import Part, PartType, AircraftModel, Aircraft, Team, Personnel, PartCategory, DefinedTeamTypes, PartStatusChoices, AircraftStatusChoices, WorkOrder, WorkOrderStatusChoices
+from .serializers import AircraftModelSerializer, AircraftSerializer, AircraftAssemblySerializer, PartTypeSerializer, TeamSerializer, PersonnelSerializer, PartSerializer, WorkOrderSerializer
+from .permissions import IsAdminOrReadOnly, IsOwnerTeamOrAdminForPart, IsAssemblyTeamMemberOrAdminForAircraft, CanAssembleAircraft, IsNotAssemblyTeamForCreate
 from .filters import WorkOrderFilter, PartFilter, AircraftFilter
 
 
@@ -19,18 +19,19 @@ def frontend_login_view(request):
     """Personel giriş sayfasını sunar."""
     return render(request, 'aircraft_production_app/login.html')
 
-def frontend_dashboard_view(request): # Tek bir dashboard view'ı, JS rolü yönetecek
-    return render(request, 'aircraft_production_app/dashboard_admin.html') # Hepsi aynı ana şablonu kullanacak
+
+def frontend_dashboard_view(request):
+    """Dashboard ana sayfasını sunar."""
+    return render(request, 'aircraft_production_app/dashboard_admin.html')
+
 
 def frontend_register_view(request):
     """Yeni kullanıcı kayıt sayfasını sunar."""
     return render(request, 'aircraft_production_app/register.html')
 
 
-# === YENİ KAYIT İÇİN SERIALIZER VE VIEW ===
-from django.contrib.auth.models import User # User modelini import et
-
 class UserRegistrationSerializer(serializers.Serializer):
+    """Yeni kullanıcı kaydı için serializer."""
     username = serializers.CharField(max_length=150)
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, style={'input_type': 'password'})
@@ -55,20 +56,23 @@ class UserRegistrationSerializer(serializers.Serializer):
         user = User.objects.create_user(
             username=validated_data['username'],
             email=validated_data['email'],
-            password=validated_data['password'] # create_user şifreyi hashler
+            password=validated_data['password']
         )
-        # Yeni kullanıcı için otomatik olarak bir Personel kaydı oluştur, takım atama.
         Personnel.objects.create(user=user, team=None)
         return user
 
+
 class UserRegisterAPIView(APIView):
-    permission_classes = [permissions.AllowAny] # Herkes kayıt olabilir
+    """
+    Yeni kullanıcı kaydı işlemlerini yönetir.
+    POST: Yeni kullanıcı oluşturur.
+    """
+    permission_classes = [permissions.AllowAny]
 
     def post(self, request, *args, **kwargs):
         serializer = UserRegistrationSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
-            # Başarılı kayıt sonrası token döndürmek yerine sadece başarı mesajı
             return Response(
                 {"message": f"Kullanıcı '{user.username}' başarıyla oluşturuldu. Lütfen giriş yapın."},
                 status=drf_status.HTTP_201_CREATED
@@ -76,7 +80,6 @@ class UserRegisterAPIView(APIView):
         return Response(serializer.errors, status=drf_status.HTTP_400_BAD_REQUEST)
 
 
-# Oturum açmış kullanıcı bilgilerini döndürür
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def current_user_info(request):
@@ -85,11 +88,11 @@ def current_user_info(request):
     """
     user = request.user
     try:
-        personnel = user.personnel # OneToOneField ile erişim
+        personnel = user.personnel
         personnel_data = PersonnelSerializer(personnel).data
     except Personnel.DoesNotExist:
         personnel_data = None
-    
+
     return Response({
         'id': user.id,
         'username': user.username,
@@ -101,192 +104,178 @@ def current_user_info(request):
         'personnel_profile': personnel_data
     })
 
+
 class AircraftModelViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    Hava Aracı Modellerini listeler ve detaylarını görüntüler.
-    Bu veriler sabit olduğu için sadece okuma.
+    Hava Aracı Modellerini listeleyen ve detaylarını gösteren ViewSet.
     """
     queryset = AircraftModel.objects.all()
     serializer_class = AircraftModelSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+
 class PartTypeViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    Parça Tiplerini (Kategorilerini) listeler ve detaylarını görüntüler.
-    Bu veriler sabit olduğu için sadece okuma.
+    Parça tiplerini (kategorilerini) okuma amaçlı ViewSet.
     """
     queryset = PartType.objects.all()
     serializer_class = PartTypeSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-class TeamViewSet(viewsets.ModelViewSet): # ReadOnlyModelViewSet -> ModelViewSet
+
+class TeamViewSet(viewsets.ModelViewSet):
     """
-    Takımları listeler ve detaylarını görüntüler.
-    Adminler CRUD yapabilir.
+    Takımların CRUD işlemlerini yöneten ViewSet.
+    Sadece admin erişimine açıktır.
     """
-    queryset = Team.objects.all().prefetch_related('members') # Performans için
+    queryset = Team.objects.all().prefetch_related('members')
     serializer_class = TeamSerializer
-    permission_classes = [permissions.IsAdminUser] # Sadece adminler CRUD yapabilsin
+    permission_classes = [permissions.IsAdminUser]
 
     def get_queryset(self):
         """
-        İsteğe bağlı olarak 'team_type' query parametresine göre takımları filtreler.
+        query_params içinde 'team_type' varsa takımları filtreler.
         """
-        queryset = Team.objects.all().prefetch_related('members') # Temel queryset
-        
+        queryset = Team.objects.all().prefetch_related('members')
         team_type_filter = self.request.query_params.get('team_type')
         if team_type_filter:
-            # Gelen team_type_filter değerinin DefinedTeamTypes içinde geçerli bir key olup olmadığını kontrol edebiliriz.
-            # Örneğin: if team_type_filter in DefinedTeamTypes.values:
-            # Şimdilik doğrudan filtrelemeye çalışıyoruz.
-            # DefinedTeamTypes.ASSEMBLY_TEAM gibi bir enum key'i bekleniyor.
             queryset = queryset.filter(team_type=team_type_filter)
-            
         return queryset
+
 
 class PersonnelViewSet(viewsets.ModelViewSet):
     """
-    Personelleri listeler ve detaylarını görüntüler.
-    Adminler personellerin takımlarını atayabilir/değiştirebilir ve personelleri silebilir.
+    Personel bilgilerini görüntüleyen ve düzenleyen ViewSet.
+    Sadece adminler personel kaydı oluşturabilir/değiştirebilir.
     """
     queryset = Personnel.objects.select_related('user', 'team').all()
     serializer_class = PersonnelSerializer
-    permission_classes = [permissions.IsAdminUser] # Sadece adminler bu işlemleri yapabilsin
-    lookup_field = 'user' # URL'de /api/personnel/{user_id}/ şeklinde erişim için
+    permission_classes = [permissions.IsAdminUser]
+    lookup_field = 'user'
 
     def perform_create(self, serializer):
-        # Bu endpoint üzerinden yeni User + Personnel oluşturulması beklenmiyor.
-        # UserRegisterAPIView bu işi yapıyor.
-        # Eğer bir User var ama Personnel'i yoksa ve buraya bir istek gelirse,
-        # serializer'ın create metodu (eğer varsa) bunu yönetebilir.
-        # Şimdilik, bu endpoint'ten yeni personel oluşturmayı engelliyoruz.
+        """Yeni personel ekleme işlemlerini engeller."""
         raise serializers.ValidationError({"detail": "Yeni personel oluşturma bu endpoint üzerinden desteklenmiyor. Lütfen kayıt sayfasını kullanın ve ardından buradan takım atayın."})
+
 
 class PartViewSet(viewsets.ModelViewSet):
     """
-    Üretilmiş Parçaları yönetmek için API endpoint'i.
-    - Üretimci kendi takımının ürettiği parçaları listeler.
-    - Üretimci kendi takımının uzmanlığına göre yeni parça üretebilir.
-    - Üretimci kendi takımının ürettiği parçaları geri dönüştürebilir.
+    Parça üretim ve yönetim işlemlerini yöneten ViewSet.
+    Üretim takımları, kendi ürettiği parçalar üzerinde değişiklik yapabilir.
     """
     serializer_class = PartSerializer
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
-    filterset_class = PartFilter # Özel FilterSet'imiz
+    filterset_class = PartFilter
 
-    ordering_fields = [ # API üzerinden hangi alanlara göre sıralama yapılabileceği
-        'id', 
+    ordering_fields = [
+        'id',
         'serial_number',
-        'part_type__category', 
-        'aircraft_model_compatibility__name', 
-        'status', 
-        'produced_by_team__name', 
+        'part_type__category',
+        'aircraft_model_compatibility__name',
+        'status',
+        'produced_by_team__name',
         'production_date',
         'created_by_personnel__user__username'
     ]
-    search_fields = [ # Genel arama (DataTable'ın sağ üstündeki arama kutusu) hangi alanlarda çalışsın?
+    search_fields = [
         'id',
-        'serial_number', 
-        'part_type__category', # PartType'ın category alanı üzerinden
-        'aircraft_model_compatibility__name', # AircraftModel'in name alanı üzerinden
+        'serial_number',
+        'part_type__category',
+        'aircraft_model_compatibility__name',
         'produced_by_team__name',
         'created_by_personnel__user__username'
     ]
 
     def get_permissions(self):
+        """İşleme göre izin kontrolü uygular."""
         if self.action in ['update', 'partial_update', 'destroy']:
-            # Admin, Montajcı (tüm parçalar), Üretimci (kendi parçaları)
             if self.request.user.is_authenticated:
                 if self.request.user.is_staff or self.request.user.is_superuser:
                     self.permission_classes = [permissions.IsAdminUser]
                 elif hasattr(self.request.user, 'personnel') and self.request.user.personnel.team and self.request.user.personnel.team.can_perform_assembly():
-                    self.permission_classes = [permissions.IsAuthenticated] # Montajcı tüm parçaları geri dönüştürebilir
-                else: # Üretimci için
+                    self.permission_classes = [permissions.IsAuthenticated]
+                else:
                     self.permission_classes = [permissions.IsAuthenticated, IsOwnerTeamOrAdminForPart]
             else:
-                self.permission_classes = [permissions.IsAuthenticated] # Fallback
+                self.permission_classes = [permissions.IsAuthenticated]
         elif self.action == 'create':
             self.permission_classes = [permissions.IsAuthenticated, IsNotAssemblyTeamForCreate]
-        else: # list, retrieve
-            self.permission_classes = [permissions.IsAuthenticated] # Herkes listeleyebilir (get_queryset filtreler)
+        else:
+            self.permission_classes = [permissions.IsAuthenticated]
         return super().get_permissions()
 
     def get_queryset(self):
+        """İlgili kullanıcının rolüne göre parça listesini döndürür."""
         user = self.request.user
-        # Temel queryset, tüm parçaları içerir. Filtreleme backend'leri bunu daraltacak.
         queryset = Part.objects.all().select_related(
-            'part_type', 
-            'aircraft_model_compatibility', 
-            'produced_by_team', 
-            'created_by_personnel__user' # Kullanıcı adına erişim için
+            'part_type',
+            'aircraft_model_compatibility',
+            'produced_by_team',
+            'created_by_personnel__user'
         )
 
-        if user.is_superuser or user.is_staff: # Adminler tümünü (filtrelenmişse filtrelenmiş halini) görür
+        if user.is_superuser or user.is_staff:
             return queryset.order_by('-production_date')
-        
+
         try:
             personnel = user.personnel
             if personnel.team:
-                if personnel.team.can_perform_assembly(): # Montajcı tüm parçaları (filtrelenmişse filtrelenmiş halini) görür
-                    # Filtreleme DjangoFilterBackend tarafından yapılacak.
+                if personnel.team.can_perform_assembly():
                     if not self.request.query_params.get('status'):
-                         return queryset.filter(status=PartStatusChoices.AVAILABLE).order_by('-production_date')
-                    return queryset.order_by('-production_date') # Status filtresi varsa, tümünü bu filtreye göre döndür
-                else: # Üretim takımı ise sadece kendi ürettiklerini (tüm durumlar filtrelenebilir)
+                        return queryset.filter(status=PartStatusChoices.AVAILABLE).order_by('-production_date')
+                    return queryset.order_by('-production_date')
+                else:
                     return queryset.filter(produced_by_team=personnel.team).order_by('-production_date')
         except Personnel.DoesNotExist:
-            return queryset.none() # Personel profili olmayanlar (admin değilse)
-            
-        return queryset.none() # Diğer tüm durumlar için
+            return queryset.none()
+
+        return queryset.none()
 
     def perform_create(self, serializer):
+        """Parça oluşturma sırasında takım ve personel ataması yapar."""
         user = self.request.user
         try:
             personnel = user.personnel
             if not personnel or not personnel.team:
                 raise serializers.ValidationError("Parça üretebilmek için bir takıma atanmış olmalısınız.")
-            
+
             team = personnel.team
-
-            # Takımın üretebileceği parça kategorisini bul
             producible_category_enum_member = team.get_producible_part_category()
-            if not producible_category_enum_member and not (user.is_staff or user.is_superuser): # Adminler için bu kontrol esnetilebilir
+            if not producible_category_enum_member and not (user.is_staff or user.is_superuser):
                 raise serializers.ValidationError(f"Takımınızın ({team.name}) üretebileceği bir parça kategorisi tanımlanmamış.")
-            
-            part_type_instance = get_object_or_404(PartType, category=producible_category_enum_member.value)
-            
-            if not team.members.exists(): # Modelin clean() metodu da kontrol ediyor ama burada da edebiliriz.
-                 raise serializers.ValidationError(f"Takımınızda ({team.name}) kayıtlı personel bulunmamaktadır. Üretim yapabilmek için önce personel ekleyiniz.")
 
-            # aircraft_model_compatibility serializer.validated_data'dan gelecek
+            part_type_instance = get_object_or_404(PartType, category=producible_category_enum_member.value)
+
+            if not team.members.exists():
+                raise serializers.ValidationError(f"Takımınızda ({team.name}) kayıtlı personel bulunmamaktadır. Üretim yapabilmek için önce personel ekleyiniz.")
+
             serializer.save(
                 part_type=part_type_instance,
                 produced_by_team=team,
                 created_by_personnel=personnel,
-                status=PartStatusChoices.AVAILABLE # Yeni üretilen parça direkt mevcut olsun
+                status=PartStatusChoices.AVAILABLE
             )
         except Personnel.DoesNotExist:
             raise serializers.ValidationError("Bu işlemi yapmak için geçerli bir personel kaydınız bulunmuyor.")
 
-
-
-
     def perform_destroy(self, instance):
-        """
-        Bir parçayı silmek yerine durumunu 'RECYCLED' yapar (yumuşak silme).
-        Modelin kendi delete() metodu bu işi yapıyordu.
-        """
+        """Gerçek silme yerine parçayı geri dönüştürür."""
         try:
-            instance.delete() # Modeldeki override edilmiş delete() metodunu çağırır
-        except DjangoValidationError as e: # Modelin delete metodundan gelebilecek validasyon hatası
+            instance.delete()
+        except DjangoValidationError as e:
             error_messages = e.messages if hasattr(e, 'messages') else str(e)
             raise serializers.ValidationError(error_messages)
 
 
 class AssembleAircraftAPIView(APIView):
+    """
+    Montaj işlemleri için kullanılan API endpoint.
+    POST: Yeni uçak montajı gerçekleştirir.
+    """
     permission_classes = [permissions.IsAuthenticated, CanAssembleAircraft]
-    serializer_class = AircraftAssemblySerializer # Gelen isteği doğrulamak için
+    serializer_class = AircraftAssemblySerializer
 
-    @transaction.atomic # Tüm işlemler ya başarılı olmalı ya da geri alınmalı
+    @transaction.atomic
     def post(self, request, *args, **kwargs):
         serializer = AircraftAssemblySerializer(data=request.data)
         if not serializer.is_valid():
@@ -298,7 +287,6 @@ class AssembleAircraftAPIView(APIView):
 
         try:
             personnel = request.user.personnel
-            # İzin sınıfı zaten kontrol ediyor ama burada da bir güvence olabilir.
             if not personnel.team or not personnel.team.can_perform_assembly():
                 return Response({"error": "Bu işlemi yapmak için yetkili bir montaj takımına üye olmalısınız."}, status=drf_status.HTTP_403_FORBIDDEN)
             assembling_team = personnel.team
@@ -314,8 +302,6 @@ class AssembleAircraftAPIView(APIView):
             if target_work_order.status in [WorkOrderStatusChoices.COMPLETED, WorkOrderStatusChoices.CANCELLED]:
                 return Response({"error": "Bu iş emri tamamlanmış veya iptal edilmiş, yeni uçak monte edilemez."}, status=drf_status.HTTP_400_BAD_REQUEST)
 
-
-        # Gerekli parçaları bulma mantığı
         required_parts = {}
         missing_parts_info = []
 
@@ -333,7 +319,7 @@ class AssembleAircraftAPIView(APIView):
                 part_type=part_type_for_slot,
                 aircraft_model_compatibility=target_aircraft_model,
                 status=PartStatusChoices.AVAILABLE
-            ).order_by('production_date').first() # FIFO: İlk üretilen uygun parçayı al
+            ).order_by('production_date').first()
 
             if not available_part:
                 missing_parts_info.append(f"{target_aircraft_model.get_name_display()} için {part_type_for_slot.get_category_display()}")
@@ -346,34 +332,35 @@ class AssembleAircraftAPIView(APIView):
                 status=drf_status.HTTP_400_BAD_REQUEST
             )
 
-        # Tüm parçalar bulundu, uçağı oluştur
         try:
             new_aircraft = Aircraft(
                 aircraft_model=target_aircraft_model,
                 assembled_by_team=assembling_team,
                 assembled_by_personnel=personnel,
-                work_order=target_work_order, # None olabilir
+                work_order=target_work_order,
                 wing=required_parts.get('wing'),
                 fuselage=required_parts.get('fuselage'),
                 tail=required_parts.get('tail'),
                 avionics=required_parts.get('avionics')
             )
-            new_aircraft.full_clean() # Modelin clean() metodunu çalıştır (parça uyumluluğu vs.)
-            new_aircraft.save() # Bu, seri no atama ve parça durumlarını USED yapma mantığını tetikler
+            new_aircraft.full_clean()
+            new_aircraft.save()
 
-            # Başarılı cevap için uçağı serialize et
             response_serializer = AircraftSerializer(new_aircraft)
             return Response(response_serializer.data, status=drf_status.HTTP_201_CREATED)
 
         except DjangoValidationError as e:
             return Response({"error": "Uçak oluşturulurken doğrulama hatası.", "details": e.message_dict if hasattr(e, 'message_dict') else e.messages},
                             status=drf_status.HTTP_400_BAD_REQUEST)
-        except Exception as e: # Beklenmedik diğer hatalar için
+        except Exception as e:
             return Response({"error": "Uçak montajı sırasında bir hata oluştu.", "details": str(e)},
                             status=drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class AircraftViewSet(viewsets.ModelViewSet):
+    """
+    Uçakların görüntülenmesi ve (admin) tarafından eklenmesi için ViewSet.
+    """
     serializer_class = AircraftSerializer
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
     filterset_class = AircraftFilter
@@ -387,128 +374,117 @@ class AircraftViewSet(viewsets.ModelViewSet):
     ]
 
     def get_permissions(self):
+        """İşleme göre izin kontrolü uygular."""
         if self.action in ['update', 'partial_update', 'destroy']:
-            # Admin ve uçağı monte eden takımın üyesi geri dönüştürebilir/güncelleyebilir.
             self.permission_classes = [permissions.IsAuthenticated, IsAssemblyTeamMemberOrAdminForAircraft]
-        elif self.action == 'create': 
-            # Uçak oluşturma normalde AssembleAircraftAPIView ile yapılır.
-            # Bu ViewSet üzerinden direkt uçak oluşturma sadece adminlere açık olmalı (manuel kayıt için).
-            self.permission_classes = [permissions.IsAdminUser] 
+        elif self.action == 'create':
+            self.permission_classes = [permissions.IsAdminUser]
         elif self.action in ['list', 'retrieve']:
-            # Adminler ve Montajcılar listeleyebilir. Üretimciler göremez.
             self.permission_classes = [permissions.IsAuthenticated]
-        else: # list, retrieve
+        else:
             self.permission_classes = [permissions.IsAuthenticated]
         return super().get_permissions()
 
     def get_queryset(self):
+        """Mevcut kullanıcı rolüne uygun uçağı listeler."""
         user = self.request.user
         queryset = Aircraft.objects.all().select_related(
-            'aircraft_model', 'assembled_by_team', 
+            'aircraft_model', 'assembled_by_team',
             'assembled_by_personnel__user', 'work_order',
-            'wing', 'fuselage', 'tail', 'avionics' 
+            'wing', 'fuselage', 'tail', 'avionics'
         )
-        
-        # DjangoFilterBackend filtrelemeyi yapacak.
 
         if user.is_superuser or user.is_staff:
             return queryset.order_by('-assembly_date')
-        
+
         try:
             personnel = user.personnel
             if personnel and personnel.team and personnel.team.can_perform_assembly():
-                # Montajcı kendi takımının monte ettiği uçakları (filtrelenmişse filtrelenmiş halini) görür
                 return queryset.filter(assembled_by_team=personnel.team).order_by('-assembly_date')
         except Personnel.DoesNotExist:
-            return queryset.none() # Personel profili yoksa (ve admin değilse)
-        
-        return queryset.none() # Üretimciler veya takımı olmayan personel (admin değilse) uçak listesi görmez
-    
+            return queryset.none()
+
+        return queryset.none()
+
     def perform_destroy(self, instance):
         """
         Bir uçağı fiziksel olarak silmek yerine 'RECYCLED' yapar (yumuşak silme).
         Modelin kendi delete() metodu bu işi yapıyordu.
         """
         try:
-            instance.delete() # Modeldeki override edilmiş delete() metodunu çağırır
+            instance.delete()
         except DjangoValidationError as e:
             raise serializers.ValidationError(e.detail if hasattr(e, 'detail') else e.messages)
-        
 
-class WorkOrderViewSet(viewsets.ModelViewSet): # CRUD işlemleri için ModelViewSet
+
+class WorkOrderViewSet(viewsets.ModelViewSet):
+    """
+    İş emirlerini yönetmek için CRUD fonksiyonlarını barındıran ViewSet.
+    """
     serializer_class = WorkOrderSerializer
 
     filter_backends = [
-        DjangoFilterBackend,      # django-filter ile özel filtreleme için
-        filters.OrderingFilter,   # ?ordering=alan_adi ile sıralama için
-        filters.SearchFilter      # ?search=arama_terimi ile genel arama için
+        DjangoFilterBackend,
+        filters.OrderingFilter,
+        filters.SearchFilter
     ]
-    filterset_class = WorkOrderFilter # aircraft_production_app/filters.py içinde tanımlayacağız
-    
-    ordering_fields = [ # API üzerinden hangi alanlara göre sıralama yapılabileceği
-        'id', 
-        'aircraft_model__name', 
-        'quantity', 
-        'status', 
-        'created_at', 
-        'target_completion_date', 
+    filterset_class = WorkOrderFilter
+
+    ordering_fields = [
+        'id',
+        'aircraft_model__name',
+        'quantity',
+        'status',
+        'created_at',
+        'target_completion_date',
         'assigned_to_assembly_team__name'
     ]
-    search_fields = [ # Genel arama (DataTable'ın sağ üstündeki arama kutusu) hangi alanlarda çalışsın?
-        'id', 
-        'aircraft_model__name', 
-        'notes', 
-        'assigned_to_assembly_team__name', 
+    search_fields = [
+        'id',
+        'aircraft_model__name',
+        'notes',
+        'assigned_to_assembly_team__name',
         'created_by__username'
     ]
 
     def get_permissions(self):
-        """
-        Action'a göre farklı izinler ata.
-        """
+        """Oluşturma, güncelleme, silme sadece admin yetkisine açıktır."""
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            self.permission_classes = [permissions.IsAdminUser] # Sadece adminler iş emri oluşturabilir/değiştirebilir/silebilir
+            self.permission_classes = [permissions.IsAdminUser]
         elif self.action in ['list', 'retrieve']:
-            self.permission_classes = [permissions.IsAuthenticated] # Adminler ve Montajcılar listeleyebilir
+            self.permission_classes = [permissions.IsAuthenticated]
         else:
             self.permission_classes = [permissions.IsAdminUser]
         return super().get_permissions()
 
     def get_queryset(self):
+        """Montaj takımı veya admin rolüne göre iş emirlerini döndürür."""
         user = self.request.user
         queryset = WorkOrder.objects.all().select_related(
-            'aircraft_model', 
-            'created_by', 
+            'aircraft_model',
+            'created_by',
             'assigned_to_assembly_team'
         )
 
-        # DjangoFilterBackend filtrelemeyi yapacak.
-
-        if user.is_superuser or user.is_staff: # Adminler (filtrelenmişse) tümünü görebilir
+        if user.is_superuser or user.is_staff:
             return queryset.order_by('-created_at')
-        
+
         try:
             personnel = user.personnel
-            if personnel and personnel.team and personnel.team.can_perform_assembly(): # Eğer kullanıcı bir Montaj Takımı üyesi ise
-                # Montajcılar, kendilerine atanmış veya henüz atanmamış (PENDING, IN_PROGRESS)
-                # ve tamamlanmamış/iptal edilmemiş iş emirlerini görür.
-                # WorkOrderFilter sınıfı bu filtrelemeyi daha detaylı yapabilir.
-                # Şimdilik, montajcıya tüm iş emirlerini (filtrelenmişse filtrelenmiş) gösterelim.
-                # Eğer status filtresi varsa, o filtre öncelikli olur.
+            if personnel and personnel.team and personnel.team.can_perform_assembly():
                 visibility_filter = models.Q(assigned_to_assembly_team=personnel.team) | models.Q(assigned_to_assembly_team__isnull=True, status=WorkOrderStatusChoices.PENDING) | models.Q(assigned_to_assembly_team__isnull=True, status=WorkOrderStatusChoices.IN_PROGRESS)
 
                 return queryset.filter(visibility_filter).distinct().order_by('-created_at')
-            else: # Diğer roller (örn: Üretimciler) iş emirlerini bu viewset üzerinden görmez.
+            else:
                 return queryset.none()
-            
+
         except Personnel.DoesNotExist:
-            return queryset.none() # Personel profili olmayanlar (admin değilse)
-        
-        return queryset.none() # Diğer tüm durumlar için (örn: üretimci)
+            return queryset.none()
+
+        return queryset.none()
 
     def perform_create(self, serializer):
-        # API üzerinden yeni iş emri oluşturulursa, oluşturan kişiyi otomatik ata
-        # Status ataması modelin save() metodunda (PENDING/ASSIGNED)
+        """İş emri oluşturulurken, oluşturan kullanıcıyı otomatik ata."""
         serializer.save(created_by=self.request.user)
 
     def perform_destroy(self, instance):
@@ -517,7 +493,7 @@ class WorkOrderViewSet(viewsets.ModelViewSet): # CRUD işlemleri için ModelView
         Modelin kendi delete() metodu bu işi yapıyordu.
         """
         try:
-            instance.delete() # Modeldeki override edilmiş delete() metodunu çağırır
+            instance.delete()
         except DjangoValidationError as e:
             error_messages = e.messages if hasattr(e, 'messages') else str(e)
             raise serializers.ValidationError(error_messages)
@@ -528,11 +504,6 @@ class WorkOrderViewSet(viewsets.ModelViewSet): # CRUD işlemleri için ModelView
 def StockLevelsAPIView(request):
     """
     Parça veya uçak stok seviyelerini DataTable uyumlu formatta döndürür.
-    Query Params:
-        - stock_type (str, zorunlu): 'parts' veya 'aircrafts'
-        - aircraft_model_id (int, isteğe bağlı): Belirli bir uçak modelini filtreler.
-        - part_category_id (int, PartType ID, isteğe bağlı): Belirli bir parça kategorisini filtreler.
-        - (DataTable standart parametreleri: draw, start, length, search[value], order[0][column], order[0][dir])
     """
     stock_type = request.query_params.get('stock_type')
     if stock_type not in ['parts', 'aircrafts']:
@@ -550,22 +521,20 @@ def StockLevelsAPIView(request):
         if user_personnel.team:
             user_team = user_personnel.team
             user_can_assemble = user_team.can_perform_assembly()
-            if not user_can_assemble: # Montajcı değilse, üretimcidir
+            if not user_can_assemble:
                 producible_category_enum = user_team.get_producible_part_category()
                 if producible_category_enum:
                     user_producible_category_value = producible_category_enum.value
     except Personnel.DoesNotExist:
-        if not user_is_admin: # Admin değilse ve personel profili yoksa boş döner
+        if not user_is_admin:
             return Response({'draw': int(request.query_params.get('draw', 0)), 'recordsTotal': 0, 'recordsFiltered': 0, 'data': []}, status=drf_status.HTTP_200_OK)
 
-    # DataTable parametreleri
     draw = int(request.query_params.get('draw', 0))
     start = int(request.query_params.get('start', 0))
     length = int(request.query_params.get('length', 10))
-    if length == -1: # "Tümü" seçeneği için
-        length = 999999 
+    if length == -1:
+        length = 999999
 
-    # Genel filtreler
     aircraft_model_id_filter = request.query_params.get('aircraft_model_id')
 
     data_list = []
@@ -585,33 +554,29 @@ def StockLevelsAPIView(request):
         if aircraft_model_id_filter:
             aircraft_models_for_parts = aircraft_models_for_parts.filter(id=aircraft_model_id_filter)
 
-        # Tüm olası (model, part_type) kombinasyonlarını oluştur
         all_combinations = []
         if aircraft_models_for_parts.exists() and part_types_to_query.exists():
             for am_part in aircraft_models_for_parts:
                 for pt in part_types_to_query:
-                    all_combinations.append({'am_id': am_part.id, 'am_name': am_part.get_name_display(), 
+                    all_combinations.append({'am_id': am_part.id, 'am_name': am_part.get_name_display(),
                                              'pt_id': pt.id, 'pt_name': pt.get_category_display()})
-        
-        records_total = len(all_combinations) # Başlangıçta toplam kayıt sayısı bu
 
-        # Gerçek stok sayılarını al
+        records_total = len(all_combinations)
+
         part_stock_query = Part.objects
         if aircraft_model_id_filter:
             part_stock_query = part_stock_query.filter(aircraft_model_compatibility_id=aircraft_model_id_filter)
         if part_category_id_filter:
             part_stock_query = part_stock_query.filter(part_type_id=part_category_id_filter)
-        
-        # Üretimci sadece kendi ürettiği kategorideki parçaların stoğunu görür
+
         if not user_is_admin and not user_can_assemble and user_producible_category_value:
             part_stock_query = part_stock_query.filter(part_type__category=user_producible_category_value)
 
         raw_part_stock_data = part_stock_query.values(
             'aircraft_model_compatibility_id', 'part_type_id', 'status'
-        ).annotate(count=models.Count('id')).order_by() # order_by() gruplamayı temizler
+        ).annotate(count=models.Count('id')).order_by()
 
-        # Stok sayılarını (model_id, part_type_id) -> {status: count} şeklinde işle
-        processed_part_counts = {} # (am_id, pt_id) -> {status: count}
+        processed_part_counts = {}
         for item in raw_part_stock_data:
             key = (item['aircraft_model_compatibility_id'], item['part_type_id'])
             if key not in processed_part_counts: processed_part_counts[key] = {}
@@ -620,7 +585,7 @@ def StockLevelsAPIView(request):
         for combo in all_combinations:
             current_key = (combo['am_id'], combo['pt_id'])
             counts_for_this_combo = processed_part_counts.get(current_key, {})
-            
+
             row_data = {
                 "aircraft_model_name": combo['am_name'],
                 "part_type_category_display": combo['pt_name'],
@@ -628,15 +593,14 @@ def StockLevelsAPIView(request):
             }
             for status_choice, status_label in PartStatusChoices.choices:
                 row_data[status_choice] = counts_for_this_combo.get(status_choice, 0)
-            
+
             data_list.append(row_data)
-        
-        records_filtered = len(data_list) # Filtreleme sonrası (şimdilik tüm kombinasyonlar)
-        # Burada DataTable search ve ordering uygulanabilir, şimdilik basit tutuyoruz.
-        data_list = data_list[start : start + length]
+
+        records_filtered = len(data_list)
+        data_list = data_list[start: start + length]
 
     elif stock_type == 'aircrafts':
-        if not (user_is_admin or user_can_assemble): # Üretimciler uçak stoğu görmez
+        if not (user_is_admin or user_can_assemble):
             return Response({'draw': draw, 'recordsTotal': 0, 'recordsFiltered': 0, 'data': []}, status=drf_status.HTTP_200_OK)
 
         aircraft_models_for_stock = AircraftModel.objects.all()
@@ -646,15 +610,14 @@ def StockLevelsAPIView(request):
         all_aircraft_model_combos = []
         if aircraft_models_for_stock.exists():
             for am_stock in aircraft_models_for_stock:
-                 all_aircraft_model_combos.append({'am_id': am_stock.id, 'am_name': am_stock.get_name_display()})
-        
+                all_aircraft_model_combos.append({'am_id': am_stock.id, 'am_name': am_stock.get_name_display()})
+
         records_total = len(all_aircraft_model_combos)
 
         aircraft_stock_query = Aircraft.objects
         if aircraft_model_id_filter:
             aircraft_stock_query = aircraft_stock_query.filter(aircraft_model_id=aircraft_model_id_filter)
-        
-        # Montajcı sadece kendi takımının monte ettiği uçakların stoğunu görür
+
         if user_can_assemble and not user_is_admin and user_team:
             aircraft_stock_query = aircraft_stock_query.filter(assembled_by_team=user_team)
 
@@ -662,7 +625,7 @@ def StockLevelsAPIView(request):
             'aircraft_model_id', 'status'
         ).annotate(count=models.Count('id')).order_by()
 
-        processed_aircraft_counts = {} # am_id -> {status: count}
+        processed_aircraft_counts = {}
         for item in raw_aircraft_stock_data:
             key = item['aircraft_model_id']
             if key not in processed_aircraft_counts: processed_aircraft_counts[key] = {}
@@ -676,7 +639,7 @@ def StockLevelsAPIView(request):
             data_list.append(row_data)
 
         records_filtered = len(data_list)
-        data_list = data_list[start : start + length]
+        data_list = data_list[start: start + length]
 
     return Response({
         'draw': draw,

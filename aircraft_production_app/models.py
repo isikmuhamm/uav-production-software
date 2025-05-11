@@ -6,11 +6,15 @@ from django.core.exceptions import ValidationError
 from django.db import transaction # Atomik işlemler için
 from django.db.models import Max # Max'ı import ettiğinizden emin olun
 from django.templatetags.static import static
+from django.core.exceptions import ValidationError as DjangoValidationError 
 
 
 # === SABİT TANIMLI BİLGİLER ===
 
 class DefinedTeamTypes(models.TextChoices):
+    """
+    Sistemdeki farklı takım tiplerini tanımlar.
+    """
     WING_TEAM = "WING_TEAM", "Kanat Takımı"
     FUSELAGE_TEAM = "FUSELAGE_TEAM", "Gövde Takımı"
     TAIL_TEAM = "TAIL_TEAM", "Kuyruk Takımı"
@@ -18,24 +22,37 @@ class DefinedTeamTypes(models.TextChoices):
     ASSEMBLY_TEAM = "ASSEMBLY_TEAM", "Montaj Takımı"
 
 class PartCategory(models.TextChoices): # Bu zaten vardı ve doğru
+    """
+    Üretilebilecek ana parça kategorilerini tanımlar.
+    """
     WING = "WING", "Kanat"
     FUSELAGE = "FUSELAGE", "Gövde"
     TAIL = "TAIL", "Kuyruk"
     AVIONICS = "AVIONICS", "Aviyonik"
 
 class AircraftModelChoices(models.TextChoices): # Uçak Modelleri için
+    """
+    Sistemde üretilebilen hava aracı modellerini tanımlar.
+    """
     TB2 = "TB2", "TB2"
     TB3 = "TB3", "TB3"
     AKINCI = "AKINCI", "AKINCI"
     KIZILELMA = "KIZILELMA", "KIZILELMA"
 
 
-class PartStatusChoices(models.TextChoices):    # ÜRETİLEN TEKİL PARÇALAR İÇİN DURUM SEÇENEKLERİ
+class PartStatusChoices(models.TextChoices):
+    """
+    Üretilen tekil parçaların sahip olabileceği durumları tanımlar.
+    """
     AVAILABLE = "AVAILABLE", "Kullanıma Hazır"
     USED = "USED", "Kullanıldı"
     RECYCLED = "RECYCLED", "Geri Dönüştürüldü"
+    # IN_PRODUCTION ve DEFECTIVE gibi durumlar eklenebilir, şimdilik bunlar kullanılıyor.
 
 class AircraftStatusChoices(models.TextChoices):
+    """
+    Monte edilmiş hava araçlarının sahip olabileceği durumları tanımlar.
+    """
     ACTIVE = "AVAILABLE", "Hazır"
     SOLD = "SOLD", "Satıldı"
     MAINTENANCE = "MAINTENANCE", "Bakımda"
@@ -44,6 +61,10 @@ class AircraftStatusChoices(models.TextChoices):
 # === MODELLER ===
 
 class Team(models.Model):
+    """
+    Üretim veya montaj takımlarını temsil eder.
+    Her takımın bir adı ve DefinedTeamTypes enum'ından bir tipi vardır.
+    """
     name = models.CharField(max_length=100, unique=True, verbose_name="Takım Adı")
     team_type = models.CharField(
         max_length=50,
@@ -56,10 +77,17 @@ class Team(models.Model):
 
     # Montaj yapıp yapamayacağı team_type'a göre belirlenecek
     def can_perform_assembly(self):
+        """
+        Takımın montaj yapabilme yeteneğini döndürür.
+        Sadece 'ASSEMBLY_TEAM' tipindeki takımlar montaj yapabilir.
+        """
         return self.team_type == DefinedTeamTypes.ASSEMBLY_TEAM
     
     def get_producible_part_category(self):
-        """Bu takım tipi hangi parça kategorisini üretebilir?"""
+        """
+        Takım tipine göre üretebileceği parça kategorisini (PartCategory enum üyesi) döndürür.
+        Eğer takım parça üretemiyorsa (örn: Montaj Takımı) None döner.
+        """
         if self.team_type == DefinedTeamTypes.WING_TEAM:
             return PartCategory.WING
         if self.team_type == DefinedTeamTypes.FUSELAGE_TEAM:
@@ -69,40 +97,40 @@ class Team(models.Model):
         if self.team_type == DefinedTeamTypes.AVIONICS_TEAM:
             return PartCategory.AVIONICS
         return None # Montaj takımı veya tanımsız bir tip ise None döner
-    
+
     def get_produced_item_count(self):
         """
         Takımın tipine göre ürettiği toplam ürün (uçak veya parça) sayısını döndürür.
         Tüm durumlar dahildir.
         """
         if self.team_type == DefinedTeamTypes.ASSEMBLY_TEAM:
-            # Aircraft modelinde assembled_by_team alanı Team'e ForeignKey
-            # Eğer related_name belirtilmediyse, Django otomatik olarak 'aircraft_set' oluşturur.
-            # Veya Aircraft.objects.filter(assembled_by_team=self).count() da kullanılabilir.
-            if hasattr(self, 'aircraft_set'): # Django'nun otomatik oluşturduğu related_name
+            # Aircraft modelindeki 'assembled_aircrafts' related_name'i kullanılıyor.
+            if hasattr(self, 'aircraft_set'):
                 return self.aircraft_set.count()
-            else: # Eğer related_name farklıysa veya emin olmak için doğrudan filtreleme
-                from .models import Aircraft # Circular import önlemek için metod içinde import
-                return Aircraft.objects.filter(assembled_by_team=self).count()
         else:
-            # Part modelinde produced_by_team alanı Team'e ForeignKey ve related_name='produced_parts' idi.
+            # Part modelindeki 'produced_parts' related_name'i kullanılıyor.
             return self.produced_parts.count()
     get_produced_item_count.short_description = "Üretilen Ürün Sayısı" # Admin panelindeki sütun başlığı
 
-    
     def personnel_count(self):
-        """Bu takımdaki personel sayısını döndürür."""
+        """
+        Bu takımdaki kayıtlı personel sayısını döndürür.
+        """
         # Personnel modelindeki 'team' ForeignKey'inin related_name'i 'members' idi.
         return self.members.count()
     personnel_count.short_description = "Personel Sayısı" # Admin panelindeki sütun başlığı
 
     def display_personnel_names(self):
-        """Bu takımdaki personellerin kullanıcı adlarını virgülle ayrılmış string olarak döndürür."""
+        """
+        Bu takımdaki personellerin kullanıcı adlarını virgülle ayrılmış bir string olarak döndürür.
+        Eğer personel yoksa boş string döner.
+        """
         # Personnel.user bir OneToOneField olduğu için user.username ile erişiyoruz.
         return ", ".join([personnel.user.username for personnel in self.members.all()])
     display_personnel_names.short_description = "Kayıtlı Personeller" # Admin panelindeki sütun başlığı
 
     class Meta:
+        """Meta seçenekleri."""
         verbose_name = "Takım"
         verbose_name_plural = "Takımlar"
 
@@ -110,17 +138,30 @@ class Personnel(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, primary_key=True, verbose_name="Kullanıcı",         limit_choices_to={'is_staff': False, 'is_superuser': False})
     team = models.ForeignKey(Team, on_delete=models.SET_NULL, null=True, blank=True, related_name="members", verbose_name="Takım")
 
+    """
+    Sistemdeki personelleri temsil eder. Her personel bir Django User ile birebir ilişkilidir.
+    Bir personel bir takıma atanabilir veya takımsız olabilir.
+    """
+
     def __str__(self):
+        """
+        Personel nesnesinin string temsilini döndürür (kullanıcı adı).
+        """
         return self.user.username
 
     class Meta:
+        """Meta seçenekleri."""
         verbose_name = "Personel"
         verbose_name_plural = "Personeller"
 
 class PartType(models.Model):
+    """
+    Üretilebilecek ana parça kategorilerini (Kanat, Gövde vb.) tanımlar.
+    Bu veriler genellikle sistem başlangıcında data migration ile yüklenir ve sabittir.
+    """
     category = models.CharField(
         max_length=50,
-        choices=PartCategory.choices,
+        choices=PartCategory.choices, # PartCategory enum'ından gelir
         unique=True,
         verbose_name="Parça Tipi"
     )
@@ -128,14 +169,21 @@ class PartType(models.Model):
 
 
     def __str__(self):
+        """
+        Parça tipi nesnesinin string temsilini döndürür (okunabilir kategori adı).
+        """
         return self.get_category_display()
 
     class Meta:
+        """Meta seçenekleri."""
         verbose_name = "Parça Tipi"
         verbose_name_plural = "Parça Tipleri"
 
-
 class AircraftModel(models.Model):
+    """
+    Sistemde üretilebilen farklı hava aracı modellerini (TB2, AKINCI vb.) tanımlar.
+    Her modelin bir adı ve ilişkili bir görseli olabilir.
+    """
     name = models.CharField(
         max_length=50,
         choices=AircraftModelChoices.choices, # Sabit seçenekler
@@ -144,6 +192,9 @@ class AircraftModel(models.Model):
     )
 
     def __str__(self):
+        """
+        Hava aracı modeli nesnesinin string temsilini döndürür (okunabilir model adı).
+        """
         return self.get_name_display()
 
     @property
@@ -152,7 +203,7 @@ class AircraftModel(models.Model):
         Modele ait resim dosyasının adını döndürür.
         Resimlerin aircraft_production_app/static/aircraft_production_app/images/
         klasöründe modelin 'name' alanı (enum value, örn: "TB2") ile aynı isimde
-        ve .png uzantılı olduğunu varsayar. (örn: tb2.png, akinci.png)
+        ve .png uzantılı olduğunu varsayar (örn: tb2.png, akinci.png).
         """
         if self.name:
             return f"{self.name.lower()}.png"
@@ -162,6 +213,7 @@ class AircraftModel(models.Model):
     def image_url(self):
         """
         Modele ait resmin tam statik URL'sini döndürür.
+        Eğer modele özel resim yoksa, varsayılan bir placeholder resmi döndürür.
         """
         filename = self.image_filename
         if filename:
@@ -173,12 +225,21 @@ class AircraftModel(models.Model):
         return static('aircraft_production_app/images/placeholder.png') # Varsayılan bir resim
 
     class Meta:
+        """Meta seçenekleri."""
         verbose_name = "Hava Aracı Modeli"
         verbose_name_plural = "Hava Aracı Modelleri"
 
 
 # İŞ EMRİ YÖNETİMİ
 class WorkOrderStatusChoices(models.TextChoices):
+    """
+    İş emirlerinin sahip olabileceği durumları tanımlar.
+    - PENDING: İş emri oluşturuldu, henüz bir takıma atanmadı.
+    - ASSIGNED: İş emri bir montaj takımına atandı.
+    - IN_PROGRESS: Atanan takım iş emri üzerinde çalışmaya başladı (montaj yapıyor).
+    - COMPLETED: İş emri kapsamındaki tüm hava araçları monte edildi.
+    - CANCELLED: İş emri iptal edildi.
+    """
     PENDING = "PENDING", "Beklemede"
     ASSIGNED = "ASSIGNED", "Atandı" # Montaj takımına atandı
     IN_PROGRESS = "IN_PROGRESS", "Üretimde"
@@ -186,6 +247,10 @@ class WorkOrderStatusChoices(models.TextChoices):
     CANCELLED = "CANCELLED", "İptal Edildi"
 
 class WorkOrder(models.Model):
+    """
+    Belirli bir modelden belirli sayıda hava aracının üretilmesi için oluşturulan iş emirlerini temsil eder.
+    İş emirleri yöneticiler tarafından oluşturulur ve montaj takımlarına atanabilir.
+    """
     aircraft_model = models.ForeignKey(AircraftModel, on_delete=models.PROTECT, verbose_name="Üretilecek Hava Aracı Modeli")
     quantity = models.PositiveIntegerField(default=1, verbose_name="Miktar")
     status = models.CharField(
@@ -193,7 +258,7 @@ class WorkOrder(models.Model):
         choices=WorkOrderStatusChoices.choices,
         default=WorkOrderStatusChoices.PENDING,
         verbose_name="Durum",
-        editable=True
+        editable=True # Admin panelinden durumu manuel değiştirmeye izin verir (dikkatli kullanılmalı)
     )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -201,7 +266,7 @@ class WorkOrder(models.Model):
         null=True,
         related_name="created_work_orders",
         verbose_name="Oluşturan Yönetici",
-        editable=False
+        editable=False # Otomatik atanır, formda görünmez/değiştirilemez
     )
     assigned_to_assembly_team = models.ForeignKey(
         Team,
@@ -218,7 +283,11 @@ class WorkOrder(models.Model):
     target_completion_date = models.DateField(null=True, blank=True, verbose_name="Hedef Tamamlanma Tarihi")
 
     def save(self, *args, **kwargs):
-        # Yeni bir iş emri oluşturuluyorsa (henüz pk'sı yoksa)
+        """
+        İş emri kaydedilirken özel mantık uygular:
+        - Yeni oluşturulan bir iş emri ise ve bir montaj takımına atanmışsa durumunu 'ASSIGNED',
+          atanmamışsa 'PENDING' olarak ayarlar.
+        """
         if not self.pk:
             if self.assigned_to_assembly_team:
                 self.status = WorkOrderStatusChoices.ASSIGNED
@@ -226,11 +295,14 @@ class WorkOrder(models.Model):
                 self.status = WorkOrderStatusChoices.PENDING
         super().save(*args, **kwargs) # Asıl kaydetme işlemini yap
 
-
     @transaction.atomic
     def delete(self, *args, **kwargs):
-        # İlişkili uçakların work_order alanını None yap
-        # related_name='completed_aircrafts_for_order' idi Aircraft modelindeki work_order alanı için
+        """
+        İş emrini fiziksel olarak silmek yerine "yumuşak silme" (soft delete) uygular:
+        - İş emrinin durumunu 'CANCELLED' olarak günceller.
+        - Bu iş emriyle ilişkili tüm monte edilmiş hava araçlarının 'work_order' alanını None yapar,
+          böylece uçaklar iş emrinden ayrılır ancak var olmaya devam eder.
+        """
         for aircraft in self.completed_aircrafts_for_order.all():
             aircraft.work_order = None
             aircraft.save()
@@ -240,17 +312,24 @@ class WorkOrder(models.Model):
         print(f"WorkOrder ID: {self.id} status set to CANCELLED and unlinked from aircraft (soft delete).")
 
     def __str__(self):
+        """
+        İş emri nesnesinin string temsilini döndürür.
+        """
         return f"İş Emri #{self.id} - {self.aircraft_model.name} ({self.quantity} adet) - {self.get_status_display()}"
 
     class Meta:
+        """Meta seçenekleri."""
         verbose_name = "İş Emri"
         verbose_name_plural = "İş Emirleri"
-        ordering = ['-created_at']
-
-
-
+        ordering = ['-created_at'] # Varsayılan sıralama: en yeni iş emri en üstte
 
 class Part(models.Model):
+    """
+    Üretilmiş tekil parçaları temsil eder.
+    Her parça bir parça tipine (kategori), uyumlu olduğu bir hava aracı modeline,
+    üreten takıma ve personele sahiptir. Otomatik olarak bir seri numarası atanır.
+    Durumu (Kullanıma Hazır, Kullanıldı, Geri Dönüştürüldü) takip edilir.
+    """
     # Bu part_type, PartType modeline (Kategori: Kanat, Gövde vb.) bir referanstır.
     part_type = models.ForeignKey(
         PartType,
@@ -266,7 +345,7 @@ class Part(models.Model):
         max_length=100,
         unique=True,
         verbose_name="Seri Numarası",
-        blank=True, # Otomatik atanacağı için başlangıçta boş olabilir
+        blank=True, # Otomatik atanacağı için formda boş bırakılabilir
         editable=False
     )
 
@@ -276,10 +355,6 @@ class Part(models.Model):
         related_name="produced_parts",
         verbose_name="Üreten Takım",
         limit_choices_to=~models.Q(team_type=DefinedTeamTypes.ASSEMBLY_TEAM),
-        # İleride daha detaylı bir limit_choices_to eklenebilir:
-        # Sadece PartType'ın producible_by_team_type'ına uygun takımlar seçilebilmeli.
-        # Bu, form/admin seviyesinde veya model save'de kontr2ol edilebilir.
-        # Şimdilik adminin doğru takımı seçtiğini varsayıyoruz.
     )
 
     production_date = models.DateTimeField(auto_now_add=True, verbose_name="Üretim Tarihi")
@@ -290,18 +365,21 @@ class Part(models.Model):
         verbose_name="Parça Durumu"
     )
 
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="Son Değiştirilme Tarihi") # YENİ
-    created_by_personnel = models.ForeignKey( # YENİ
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Son Değiştirilme Tarihi")
+    created_by_personnel = models.ForeignKey(
         Personnel,
         on_delete=models.SET_NULL,
         null=True,
-        blank=True, # Admin gibi bir personel olmayan kullanıcı oluşturursa diye
+        blank=True, # Eğer üreten personel sistemden silinirse veya atanmamışsa
         editable=False, # Formda görünmesin, otomatik atansın
         related_name="created_parts",
         verbose_name="Üreten Personel"
     )
 
     def get_part_type_abbreviation(self):
+        """
+        Parça kategorilerine göre seri numarasında kullanılacak kısaltmaları döndürür.
+        """
         abbreviations = {
             PartCategory.AVIONICS: "AVY",
             PartCategory.WING: "KNT",
@@ -312,43 +390,37 @@ class Part(models.Model):
         return abbreviations.get(self.part_type.category, "XXX") # Eşleşme yoksa XXX
 
     def save(self, *args, **kwargs):
+        """
+        Parça kaydedilirken özel mantık uygular:
+        - Eğer yeni bir parça ise (veya seri numarası boşsa), otomatik olarak bir seri numarası atar.
+          Seri numarası formatı: <UçakModelAdı>-<ParçaTipiKısaltması>-<SıraNo> (örn: TB2-KNT-00001).
+        """
         if not self.serial_number: # Sadece seri numarası yoksa ata (yeni kayıt veya boş bırakılmışsa)
-            # Parça tipi ve uçak modeline göre son seri numarasını bul
-            # Örn: TB2-AVY-0001
             prefix = f"{self.aircraft_model_compatibility.name}-{self.get_part_type_abbreviation()}-"
 
-            # Bu prefix ile başlayan son parçayı bulup numarasını artıracağız.
-            # Daha sağlam bir yöntem için bir "sequence" tablosu veya atomik işlemler gerekebilir
-            # yüksek eşzamanlılıkta, ama basitlik için şimdilik Max() kullanabiliriz.
-            # Bu yöntem küçük/orta ölçekli uygulamalar için yeterlidir.
-
-            # Basit bir sıralı numara için:
-            # Aynı model ve parça tipindeki parça sayısını alıp bir fazlasını kullanabiliriz.
+            # Aynı model ve parça tipindeki mevcut parça sayısını alıp bir fazlasını sıra numarası olarak kullan.
+            # Bu, basit bir sıralama sağlar. Yüksek eşzamanlılık durumları için daha karmaşık bir
+            # sequence yönetimi gerekebilir.
             last_part_count = Part.objects.filter(
                 aircraft_model_compatibility=self.aircraft_model_compatibility,
                 part_type=self.part_type
             ).exclude(pk=self.pk).count() # Kendisi hariç (güncelleme durumu için)
 
             new_sequence_no = last_part_count + 1
-            self.serial_number = f"{prefix}{new_sequence_no:05d}" # 0001, 0002 gibi formatlama
+            self.serial_number = f"{prefix}{new_sequence_no:05d}" # 5 haneli, başı sıfırla doldurulmuş sıra no
 
         super().save(*args, **kwargs) # Asıl kaydetme işlemini yap
 
-
     @transaction.atomic
     def delete(self, *args, **kwargs):
-        # Parça bir uçağa takılıysa (yani durumu USED ise) doğrudan "silinmemeli" (geri dönüştürülemez).
-        # Bu kontrolü "Geri Dönüştür" action'ı veya arayüzü yaparken ayrıca düşünmeliyiz.
-        # Şimdilik, eğer bir "silme" komutu gelirse, durumu RECYCLED yapıyoruz.
-        # Eğer parça bir uçağa takılıysa (status=USED), bu işlem normalde engellenmeli
-        # veya önce uçaktan sökülmeli. pre_delete sinyali uçağı silerken parçayı AVAILABLE yapar.
-        # Bu delete metodu, "AVAILABLE" veya "DEFECTIVE" bir parçanın geri dönüştürülmesi için daha uygun.
+        """
+        Parçayı fiziksel olarak silmek yerine "yumuşak silme" (soft delete) uygular:
+        - Parçanın durumunu 'RECYCLED' olarak günceller.
+        - Eğer parça 'USED' (bir uçağa takılı) durumdaysa, bu işlem engellenir ve bir
+          ValidationError fırlatılır. Parçanın önce uçaktan sökülmesi (bu senaryo dışı)
+          veya uçağın geri dönüştürülmesi gerekir.
+        """
         if self.status == PartStatusChoices.USED:
-            # Bu durum, bir uçağa bağlı parçanın doğrudan silinmeye/geri dönüştürülmeye çalışılmasıdır.
-            # Uçak silinirken parçalar zaten AVAILABLE yapılıyor.
-            # Belki burada bir hata vermek daha doğru olur veya hiçbir şey yapmamak.
-            # Şimdilik, doğrudan USED bir parçayı RECYCLED yapmasına izin vermeyelim.
-            # Kullanıcı önce uçağı "geri dönüştürmeli" veya parçayı uçaktan "sökmeli" (bu senaryo dışı).
             raise ValidationError(f"'{self.serial_number}' seri numaralı parça şu anda bir uçağa takılı (Kullanımda). Doğrudan geri dönüştürülemez/silinemez.")
 
         self.status = PartStatusChoices.RECYCLED
@@ -357,14 +429,17 @@ class Part(models.Model):
 
             
     def clean(self):
+        """
+        Model kaydedilmeden önce ek doğrulamalar yapar:
+        - Parça tipi ve üreten takım seçilmiş olmalıdır.
+        - Üreten takımın tipi, seçilen parça kategorisini üretebilecek yetenekte olmalıdır.
+        - Üretim yapacak takımda en az bir personel kayıtlı olmalıdır.
+        """
         super().clean()
         # Kural 1: Üreten takım ve parça tipi seçilmiş olmalı
         if not self.part_type:
-            # Bu durum genellikle form validasyonu ile yakalanır ama ek bir güvence
             raise ValidationError({'part_type': "Parça tipi seçilmelidir."})
-        
         if not self.produced_by_team:
-            # Bu durum genellikle form validasyonu ile yakalanır ama ek bir güvence
             raise ValidationError({'produced_by_team': "Üreten takım seçilmelidir."})
 
         # Kural 2: Üreten takımın tipi, seçilen parça kategorisini üretebilecek yetenekte olmalı.
@@ -374,12 +449,9 @@ class Part(models.Model):
         if expected_category_for_team is None: # Montaj takımı gibi parça üretemeyen bir takım
             raise ValidationError({
                 'produced_by_team': (
-                    f"Seçilen takım ({self.produced_by_team}) parça üretemez, çünkü bu takım tipi parça üretimi için tanımlanmamıştır (örn: Montaj Takımı)."
+                    f"Seçilen takım ({self.produced_by_team}) parça üretemez (örn: Montaj Takımı)."
                 )
             })
-        # PartType modelindeki category alanı PartCategory enum'ından bir string değerdir.
-        # Team modelindeki get_producible_part_category() metodu da PartCategory enum üyesini döndürür.
-        # Doğrudan enum üyesinin value'su (string hali) ile karşılaştırma yapabiliriz.
         elif expected_category_for_team.value != self.part_type.category: 
             raise ValidationError({
                 'produced_by_team': (
@@ -388,17 +460,19 @@ class Part(models.Model):
                 )
             })
 
-        # YENİ KURAL: Üretim yapacak takımda en az bir personel olmalı.
-        # Personnel modeli 'members' related_name ile Team'e bağlı.
+        # Kural 3: Üretim yapacak takımda en az bir personel olmalı.
         if not self.produced_by_team.members.exists():
             raise ValidationError({
                 'produced_by_team': f"Seçilen takımda ({self.produced_by_team.name}) kayıtlı personel bulunmamaktadır. Üretim yapabilmesi için önce o takıma personel ekleyiniz."
             })
 
     def get_installed_aircraft_info(self):
+        """
+        Eğer parça 'USED' durumdaysa, takılı olduğu uçağın string temsilini döndürür.
+        Aksi halde "Takılı Değil" string'ini döndürür.
+        """
         if self.status == PartStatusChoices.USED:
             try:
-                # OneToOneField'ların related_name'lerini kontrol et
                 if hasattr(self, 'aircraft_as_wing') and self.aircraft_as_wing:
                     return f"{self.aircraft_as_wing}"
                 elif hasattr(self, 'aircraft_as_fuselage') and self.aircraft_as_fuselage:
@@ -409,19 +483,29 @@ class Part(models.Model):
                     return f"{self.aircraft_as_avionics}"
             except Aircraft.DoesNotExist: # Bu aslında OneToOneField'larda pek olmaz ama genel bir try-except
                 pass
-        return "Takılı Değil"
+        return "-" # "Takılı Değil" yerine daha kısa bir ifade
     get_installed_aircraft_info.short_description = "Takılı Olduğu Uçak" # Admin panelinde görünecek başlık
 
     def __str__(self):
+        """
+        Parça nesnesinin string temsilini döndürür.
+        """
         return f"{self.part_type.get_category_display()} - SN: {self.serial_number} ({self.aircraft_model_compatibility.name} için)"
 
     class Meta:
+        """Meta seçenekleri."""
         verbose_name = "Üretilmiş Parça"
         verbose_name_plural = "Üretilmiş Parçalar"
-        ordering = ['-production_date']
+        ordering = ['-production_date'] # Varsayılan sıralama: en yeni üretilen parça en üstte
 
 # MONTE EDİLMİŞ HAVA ARAÇLARI
 class Aircraft(models.Model):
+    """
+    Monte edilmiş hava araçlarını temsil eder.
+    Her hava aracı bir modele, otomatik atanan bir seri numarasına, montaj tarihine,
+    montajı yapan takıma/personele ve takılı olan ana parçalara (kanat, gövde vb.) sahiptir.
+    Bir iş emriyle ilişkilendirilebilir ve durumu (Hazır, Satıldı vb.) takip edilir.
+    """
     aircraft_model = models.ForeignKey(
         AircraftModel,
         on_delete=models.PROTECT,
@@ -431,10 +515,10 @@ class Aircraft(models.Model):
         max_length=100,
         unique=True,
         verbose_name="Hava Aracı Seri Numarası",
-        blank=True, # Otomatik atanacağı için
+        blank=True, # Otomatik atanacağı için formda boş bırakılabilir
         editable=False
     )
-    status = models.CharField( # YENİ ALAN
+    status = models.CharField(
         max_length=20,
         choices=AircraftStatusChoices.choices,
         default=AircraftStatusChoices.ACTIVE,
@@ -458,8 +542,8 @@ class Aircraft(models.Model):
         limit_choices_to={'team_type': DefinedTeamTypes.ASSEMBLY_TEAM} # Sadece montaj yetkisi olan takım tipine sahip takımlar
     )
 
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="Son Güncellenme Tarihi") # YENİ
-    assembled_by_personnel = models.ForeignKey( # YENİ
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Son Güncellenme Tarihi")
+    assembled_by_personnel = models.ForeignKey(
         Personnel,
         on_delete=models.SET_NULL,
         null=True,
@@ -470,55 +554,68 @@ class Aircraft(models.Model):
     )
 
     # Montaj mantığı: Her ana parça kategorisinden bir adet.
-    # OneToOneField, bir Part nesnesinin sadece bir Aircraft'ın belirli bir slotunda kullanılmasını sağlar.
-    # limit_choices_to, admin formunda doğru kategorideki parçaların seçilmesine yardımcı olur.
-    # Asıl 'AVAILABLE' durum kontrolü ve montaj sonrası Part.status='USED' yapılması view/serializer'da olacak.
     wing = models.OneToOneField(
-        Part, on_delete=models.SET_NULL, null=True, blank=True, # DEĞİŞTİ
+        Part, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="aircraft_as_wing", verbose_name="Kanat (Parça SN)",
-        limit_choices_to={'part_type__category': PartCategory.WING}
+        limit_choices_to={'part_type__category': PartCategory.WING, 'status': PartStatusChoices.AVAILABLE}
     )
     fuselage = models.OneToOneField(
-        Part, on_delete=models.SET_NULL, null=True, blank=True, # DEĞİŞTİ
+        Part, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="aircraft_as_fuselage", verbose_name="Gövde (Parça SN)",
-        limit_choices_to={'part_type__category': PartCategory.FUSELAGE}
+        limit_choices_to={'part_type__category': PartCategory.FUSELAGE, 'status': PartStatusChoices.AVAILABLE}
     )
     tail = models.OneToOneField(
-        Part, on_delete=models.SET_NULL, null=True, blank=True, # DEĞİŞTİ
+        Part, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="aircraft_as_tail", verbose_name="Kuyruk (Parça SN)",
-        limit_choices_to={'part_type__category': PartCategory.TAIL}
+        limit_choices_to={'part_type__category': PartCategory.TAIL, 'status': PartStatusChoices.AVAILABLE}
     )
     avionics = models.OneToOneField(
-        Part, on_delete=models.SET_NULL, null=True, blank=True, # DEĞİŞTİ
+        Part, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="aircraft_as_avionics", verbose_name="Aviyonik Sistem (Parça SN)",
-        limit_choices_to={'part_type__category': PartCategory.AVIONICS}
+        limit_choices_to={'part_type__category': PartCategory.AVIONICS, 'status': PartStatusChoices.AVAILABLE}
     )
 
     @transaction.atomic
     def delete(self, *args, **kwargs):
-        # pre_delete sinyali zaten parçaları AVAILABLE yapacak.
-        # Bu metot çağrıldığında, sinyal çalışmış olmalı.
+        """
+        Hava aracını fiziksel olarak silmek yerine "yumuşak silme" (soft delete) uygular:
+        - Uçağa takılı olan tüm ana parçaların (kanat, gövde vb.) durumunu 'AVAILABLE' yapar.
+        - Uçağın parça bağlantılarını (wing, fuselage vb.) None yapar.
+        - Uçağın durumunu 'RECYCLED' olarak günceller.
+        """
+        parts_to_make_available = [self.wing, self.fuselage, self.tail, self.avionics]
+        for part in parts_to_make_available:
+            if part:
+                part.status = PartStatusChoices.AVAILABLE
+                part.save()
 
-        # Uçağın parça bağlantılarını None yap (SET_NULL sayesinde otomatik de olabilir ama garanti olsun)
         self.wing = None
         self.fuselage = None
         self.tail = None
         self.avionics = None
 
         self.status = AircraftStatusChoices.RECYCLED # Uçağın durumunu güncelle
-        self.save(update_fields=['wing', 'fuselage', 'tail', 'avionics', 'status']) # Değişiklikleri kaydet, fiziksel olarak silme
+        self.save(update_fields=['wing', 'fuselage', 'tail', 'avionics', 'status']) # Sadece belirtilen alanları güncelle
         print(f"Aircraft SN: {self.serial_number} status set to RECYCLED and parts unlinked (soft delete).")
 
     def __str__(self):
         return f"{self.aircraft_model.name if self.aircraft_model else 'Model Belirtilmemiş'} - SN: {self.serial_number or 'Henüz Yok'}"
 
     class Meta:
+        """Meta seçenekleri."""
         verbose_name = "Üretilmiş Hava Aracı"
         verbose_name_plural = "Üretilmiş Hava Araçları"
-        ordering = ['-assembly_date']
-
+        ordering = ['-assembly_date'] # Varsayılan sıralama: en yeni monte edilen uçak en üstte
 
     def clean(self):
+        """
+        Model kaydedilmeden önce ek doğrulamalar yapar:
+        - Eğer bir iş emriyle ilişkilendirilmişse, uçak modelinin iş emrindeki modelle eşleştiğini kontrol eder.
+        - Tamamlanmış veya iptal edilmiş bir iş emrine uçak atanamayacağını/değiştirilemeyeceğini kontrol eder.
+        - Takılan parçaların uçağın modeliyle uyumlu olup olmadığını kontrol eder.
+        - Uçağa yeni takılan bir parçanın durumunun 'AVAILABLE' (Kullanıma Hazır) olup olmadığını kontrol eder.
+        - Eğer uçağın durumu 'ACTIVE' (Hazır) ise, tüm ana parça slotlarının (kanat, gövde vb.) dolu olmasını zorunlu kılar.
+        """
         super().clean()
 
         # Kural 1: İş emri varsa, uçak modeli iş emrindekiyle eşleşmeli.
@@ -531,7 +628,7 @@ class Aircraft(models.Model):
                     )
                 })
 
-        # Kural 2: Tamamlanmış bir iş emrine yeni uçak atanamaz veya mevcut uçağın iş emri tamamlanmış bir tane ile değiştirilemez.
+        # Kural 2: Tamamlanmış bir iş emrine yeni uçak atanamaz/değiştirilemez.
         if self.work_order and self.work_order.status == WorkOrderStatusChoices.COMPLETED:
             is_new_assignment_to_completed_wo = False
             if not self.pk: # Yeni uçak oluşturuluyor
@@ -549,7 +646,7 @@ class Aircraft(models.Model):
                     'work_order': f"Seçilen iş emri ({self.work_order}) zaten '{WorkOrderStatusChoices.COMPLETED.label}' statüsünde. Bu iş emrine uçak atanamaz/değiştirilemez."
                 })
 
-        # YENİ KURAL: İptal edilmiş bir iş emrine uçak atanamaz.
+        # Kural 3: İptal edilmiş bir iş emrine uçak atanamaz.
         if self.work_order and self.work_order.status == WorkOrderStatusChoices.CANCELLED:
             raise ValidationError({
                 'work_order': "İptal edilmiş bir iş emrine uçak atanamaz."
@@ -579,22 +676,21 @@ class Aircraft(models.Model):
             if not current_part: # Eğer slot boşsa (parça seçilmemişse) kontrol etmeye gerek yok
                 continue
 
-            # Kural 3: Parçanın uçak modeli uyumluluğu
+            # Kural 4: Parçanın uçak modeli uyumluluğu
             if self.aircraft_model and current_part.aircraft_model_compatibility != self.aircraft_model:
                 raise ValidationError({
                     slot_name: f"Seçilen {current_part.part_type.get_category_display()} (SN: {current_part.serial_number}) bu uçak modeli ({self.aircraft_model}) ile uyumlu değil. "
                                f"Parça {current_part.aircraft_model_compatibility} modeli için üretilmiş."
                 })
 
-            # Kural 4: Slota yeni atanan parçanın durumu AVAILABLE olmalı
+            # Kural 5: Slota yeni atanan parçanın durumu AVAILABLE olmalı
             original_part_in_slot = original_parts.get(slot_name)
             if current_part != original_part_in_slot: # Parça değişmiş veya ilk kez atanıyorsa
                 if current_part.status != PartStatusChoices.AVAILABLE:
                     raise ValidationError({
                         slot_name: f"Seçilen {current_part.part_type.get_category_display()} (SN: {current_part.serial_number}) montaj için '{PartStatusChoices.AVAILABLE.label}' durumda değil. Mevcut durumu: {current_part.get_status_display()}."
                     })
-        # YENİ KONTROLLER: Aktif bir uçak için tüm parçalar seçilmiş olmalı.
-
+        # Kural 6: Aktif bir uçak için tüm ana parçalar seçilmiş olmalı.
         if self.status == AircraftStatusChoices.ACTIVE:
             if not self.wing:
                 raise ValidationError({'wing': "Aktif bir uçak için Kanat seçilmelidir."})
@@ -605,23 +701,22 @@ class Aircraft(models.Model):
             if not self.avionics:
                 raise ValidationError({'avionics': "Aktif bir uçak için Aviyonik sistem seçilmelidir."})
 
-
     @transaction.atomic
     def save(self, *args, **kwargs):
-        # === SERİ NUMARASI ATAMA MANTIĞI (GÜNCELLENDİ) ===
+        """
+        Hava aracı kaydedilirken özel mantık uygular:
+        - Eğer yeni bir hava aracı ise, otomatik olarak bir seri numarası atar.
+          Seri numarası formatı: <UçakModelAdı>-<SıraNo> (örn: TB2-0001).
+        - Uçaktan çıkarılan eski parçaların durumunu 'AVAILABLE' yapar.
+        - Uçağa yeni takılan parçaların durumunu 'USED' yapar.
+        """
         if not self.pk:  # Sadece yeni bir instance ise (henüz primary key'i yoksa) seri numarası ata.
             if not self.aircraft_model:
-                # Bu durum normalde form validasyonu veya clean() ile engellenmeli.
-                # Eğer aircraft_model None ise seri numarası üretemeyiz.
-                # Hata vermek veya olduğu gibi kaydetmeye çalışmak (DB hatası alabilir) bir seçenek.
-                # Şimdilik, aircraft_model'in dolu olduğunu varsayıyoruz (formdan zorunlu gelmeli).
-                pass # Ya da burada bir Exception raise edilebilir.
+                # aircraft_model None ise seri numarası üretemeyiz. clean() bunu engellemeli.
+                raise DjangoValidationError("Seri numarası atamak için hava aracı modeli belirtilmelidir.")
 
-            # aircraft_model.name, AircraftModelChoices enum'ının value'sunu (örn: "TB2") verir.
             prefix = f"{self.aircraft_model.name}-" 
             
-            # Bu prefix ile başlayan ve sonu sayı olan seri numaralarından en büyüğünü bul
-            # (Bir önceki IntegrityError çözümü için önerilen Max tabanlı mantık)
             last_serial_obj = Aircraft.objects.filter(
                 serial_number__startswith=prefix
             ).aggregate(max_sn_suffix=Max('serial_number'))
@@ -636,13 +731,9 @@ class Aircraft(models.Model):
                     pass # Hata durumunda max_suffix_num = 0 kalır
             
             new_sequence_no = max_suffix_num + 1
-            self.serial_number = f"{prefix}{new_sequence_no:04d}" # Örn: TB2-00001
+            self.serial_number = f"{prefix}{new_sequence_no:04d}" # 4 haneli, başı sıfırla doldurulmuş sıra no
 
-        # Parça Durum Güncelleme Mantığı (Geliştirilmiş)
-        # Django'da OneToOneField'lar kaydedildiğinde, eski ilişki otomatik olarak null yapılır (eğer nullable ise).
-        # Bizim parçalarımız PROTECT olduğu için önce manuel olarak eski parçayı ayırmamız gerekmiyor.
-        # Sadece durumlarını güncelleyeceğiz.
-
+        # Parça Durum Güncelleme Mantığı
         original_parts_to_make_available = []
         if self.pk: # Eğer obje güncelleniyorsa
             try:
@@ -661,21 +752,18 @@ class Aircraft(models.Model):
             except Aircraft.DoesNotExist:
                 pass # Yeni oluşturuluyorsa bu kısım atlanır
 
-        # Önce uçağı kaydet (ilişkilerin güncellenmesi için)
         super().save(*args, **kwargs)
 
-        # Şimdi çıkarılan eski parçaların durumunu 'AVAILABLE' yap
+        # Çıkarılan eski parçaların durumunu 'AVAILABLE' yap
         for old_part in original_parts_to_make_available:
             if old_part: # None değilse
                 old_part.status = PartStatusChoices.AVAILABLE
                 old_part.save()
 
-        # Şimdi uçağa yeni takılan/atanan parçaların durumunu 'USED' yap ve iş emrini ata
+        # Uçağa yeni takılan/atanan parçaların durumunu 'USED' yap
         current_parts_to_mark_used = [self.wing, self.fuselage, self.tail, self.avionics]
         for current_part in current_parts_to_mark_used:
             if current_part: # None değilse
-                # Sadece durumu gerçekten değişmesi gerekiyorsa güncelle (performans için)
                 if current_part.status != PartStatusChoices.USED:
                     current_part.status = PartStatusChoices.USED
-                
                 current_part.save() # Parçanın son halini kaydet

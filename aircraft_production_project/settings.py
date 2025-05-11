@@ -15,13 +15,11 @@ from dotenv import load_dotenv
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent # Projenin kök dizini
 
 load_dotenv() # .env dosyasını yüklemek için bu satırı ekleyin
 
 SECRET_KEY = os.getenv('SECRET_KEY')
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
@@ -33,19 +31,21 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
+    # Django'nun standart uygulamaları
+    'django.contrib.admin', # Yönetim paneli
+    'django.contrib.auth', # Kimlik doğrulama sistemi
+    'django.contrib.contenttypes', # İçerik tipleri framework'ü
+    'django.contrib.sessions', # Oturum yönetimi
+    'django.contrib.messages', # Mesajlaşma framework'ü
+    'django.contrib.staticfiles', # Statik dosyaların yönetimi
+
     # Üçüncü parti uygulamalar
-    'rest_framework',
-    'rest_framework.authtoken', # Token bazlı kimlik doğrulama için
-    'django_filters',
-    'drf_spectacular', 
+    'rest_framework', # Django REST framework, API oluşturmak için
+    'rest_framework.authtoken', # Token bazlı kimlik doğrulama için DRF eklentisi
+    'django_filters', # API'lerde gelişmiş filtreleme için
+    'drf_spectacular',  # API dokümantasyonu (Swagger/OpenAPI) oluşturmak için
     # Kendi uygulamalarımız
-    'aircraft_production_app',
+    'aircraft_production_app', # Ana üretim uygulamamız
 ]
 
 MIDDLEWARE = [
@@ -58,7 +58,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'aircraft_production_project.urls'
+ROOT_URLCONF = 'aircraft_production_project.urls' # Projenin ana URL yapılandırma dosyası
 
 TEMPLATES = [
     {
@@ -75,7 +75,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'aircraft_production_project.wsgi.application'
+WSGI_APPLICATION = 'aircraft_production_project.wsgi.application' # WSGI sunucuları için uygulama giriş noktası
 
 
 # Database
@@ -127,36 +127,37 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = 'static/' # Statik dosyaların sunulacağı URL ön eki
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField' # Yeni modeller için varsayılan primary key tipi
 
+# Django REST Framework Ayarları
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication', # Token tabanlı kimlik doğrulamayı varsayılan yap
+        'rest_framework.authentication.TokenAuthentication', # API için varsayılan kimlik doğrulama yöntemi
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated', # Varsayılan olarak tüm endpoint'ler kimlik doğrulaması istesin
+        'rest_framework.permissions.IsAuthenticated', # Varsayılan olarak tüm API endpoint'leri kimlik doğrulaması gerektirir
     ],
-    'DEFAULT_PAGINATION_CLASS': 'aircraft_production_app.pagination.StandardDataTablePagination',
-    'PAGE_SIZE': 10,
+    'DEFAULT_PAGINATION_CLASS': 'aircraft_production_app.pagination.StandardDataTablePagination', # DataTables ile uyumlu özel sayfalama sınıfı
+    'PAGE_SIZE': 10, # Sayfalama için varsayılan kayıt sayısı (StandardDataTablePagination bunu override edebilir)
     'DEFAULT_FILTER_BACKENDS': [
-        'django_filters.rest_framework.DjangoFilterBackend',
-        'rest_framework.filters.OrderingFilter',
-        'rest_framework.filters.SearchFilter',
+        'django_filters.rest_framework.DjangoFilterBackend', # django-filter kütüphanesi ile filtreleme
+        'rest_framework.filters.OrderingFilter',   # ?ordering=... ile sıralama
+        'rest_framework.filters.SearchFilter',     # ?search=... ile arama
     ],
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema', # drf-spectacular için varsayılan şema sınıfı
 }
 
-
+# drf-spectacular Ayarları (API Dokümantasyonu için)
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'Hava Aracı Üretim API',
-    'DESCRIPTION': 'Hava aracı üretim ve takip sistemi için geliştirilmiş API dokümantasyonu.',
-    'VERSION': '1.0.0',
-    'SERVE_INCLUDE_SCHEMA': False,  # True yaparsanız /api/schema/ altında schema.yaml da sunulur
+    'TITLE': 'Hava Aracı Üretim API', # API dokümantasyonunun başlığı
+    'DESCRIPTION': 'Hava aracı üretim ve takip sistemi için geliştirilmiş API dokümantasyonu.', # API açıklaması
+    'VERSION': '1.0.0', # API versiyonu
+    'SERVE_INCLUDE_SCHEMA': False,  # True yapılırsa /api/schema/ altında schema.yaml da sunulur
     # 'SWAGGER_UI_DIST': 'SIDECAR',  # Swagger UI dosyalarını projenizle birlikte sunmak için (CDN yerine)
     # 'SWAGGER_UI_SETTINGS': {
     #     'deepLinking': True,
@@ -164,5 +165,5 @@ SPECTACULAR_SETTINGS = {
     #     'displayOperationId': True,
     # },
     'COMPONENT_SPLIT_REQUEST': True, # Request body'lerini component olarak ayırır, daha okunabilir
-    'COMPONENT_SPLIT_PATCH': True,   # Patch request body'lerini de ayırır
+    'COMPONENT_SPLIT_PATCH': True,   # PATCH request body'lerini de component olarak ayırır
 }

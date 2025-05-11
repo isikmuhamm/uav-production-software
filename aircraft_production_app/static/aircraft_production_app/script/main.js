@@ -1,26 +1,45 @@
-// Global değişkenler base.html'den geliyor ve doğru oldukları varsayılıyor:
-// CSRF_TOKEN, API_LOGIN_URL, API_USER_ME_URL, API_APP_BASE_URL, LOGIN_PAGE_URL, DASHBOARD_URL, DATATABLES_TR_JSON_URL
- 
+// =================================================================================
+// GLOBAL VARIABLES & CONFIGURATION
+// =================================================================================
+
+// Bu global değişkenler base.html içinde tanımlanır ve uygulamanın çeşitli yerlerinde kullanılır.
+// CSRF_TOKEN: Django CSRF token'ı (AJAX POST istekleri için gerekli olabilir, ancak TokenAuthentication ile genellikle gerekmez).
+// API_LOGIN_URL: Kullanıcı girişi için API endpoint URL'si.
+// API_USER_ME_URL: Mevcut kullanıcı bilgilerini almak için API endpoint URL'si.
+// API_APP_BASE_URL: Uygulamanın ana API endpoint'lerinin temel URL'si (örn: "/api/v1/app/").
+// LOGIN_PAGE_URL: Kullanıcı giriş sayfasının URL'si.
+// DASHBOARD_URL: Başarılı giriş sonrası yönlendirilecek ana panel URL'si.
+// DATATABLES_TR_JSON_URL: DataTables eklentisi için Türkçe dil dosyasının URL'si.
+
+/** @type {string|null} Kullanıcının kimlik doğrulama token'ı. localStorage'dan alınır. */
 let authToken = localStorage.getItem('authToken');
+/** @type {object|null} Mevcut giriş yapmış kullanıcı bilgileri. localStorage'dan alınır. */
 let currentUser = localStorage.getItem('currentUser') ? JSON.parse(localStorage.getItem('currentUser')) : null;
+
+// DataTable instance'ları
+/** @type {jQuery|null} Admin parça listesi için DataTable instance'ı. */
 let adminPartsDataTable = null;
+/** @type {jQuery|null} Üretimci takımının parça listesi için DataTable instance'ı. */
 let myTeamPartsDataTable = null;
+/** @type {jQuery|null} Hava aracı listesi için DataTable instance'ı. */
 let aircraftsDataTable = null;
+/** @type {jQuery|null} İş emri listesi için DataTable instance'ı (Admin). */
 let workOrdersDataTable = null;
-let assignedWorkOrdersDataTable = null; // Yeni DataTable değişkeni
+/** @type {jQuery|null} Montajcıya atanmış iş emirleri için DataTable instance'ı. */
+let assignedWorkOrdersDataTable = null;
+/** @type {jQuery|null} Personel listesi için DataTable instance'ı. */
 let personnelDataTable = null;
+/** @type {jQuery|null} Takım listesi için DataTable instance'ı. */
 let teamsDataTable = null;
+
+/** @type {object} Devam eden API isteklerini takip etmek için kullanılır (özellikle buton bazlı). Anahtar: buton ID'si, Değer: true. */
 let isApiRequestInProgress = {};
 
-// Helper Functions
-function showSpinner() { $('#loadingSpinner').show(); }
-function hideSpinner() { 
-    // Sadece gerçekten görünürse gizle, gereksiz jQuery işlemlerini azaltır.
-    if ($('#loadingSpinner').is(':visible')) {
-        $('#loadingSpinner').hide(); 
-    }
-}
-
+/**
+ * Tarayıcı çerezlerinden belirtilen isimdeki çerezin değerini alır.
+ * @param {string} name Alınacak çerezin adı.
+ * @returns {string|null} Çerezin değeri veya bulunamazsa null.
+ */
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -35,6 +54,26 @@ function getCookie(name) {
     }
     return cookieValue;
 }
+
+
+// =================================================================================
+// HELPER FUNCTIONS
+// =================================================================================
+
+/**
+ * Genel yükleme spinner'ını gösterir.
+ */
+function showSpinner() { $('#loadingSpinner').show(); }
+
+/**
+ * Genel yükleme spinner'ını gizler (eğer görünürse).
+ */
+function hideSpinner() {
+    if ($('#loadingSpinner').is(':visible')) {
+        $('#loadingSpinner').hide();
+    }
+}
+
 
 /**
  * API'ye istek yapmak için genel bir yardımcı fonksiyon.
@@ -52,7 +91,7 @@ function makeApiRequest(endpoint, method, data, successCallback, errorCallback, 
     const buttonId = $buttonToDisable ? ($buttonToDisable.attr('id') || $buttonToDisable.text().trim().replace(/\s+/g, '_')) : null;
     
     if (buttonId && isApiRequestInProgress[buttonId]) {
-        console.warn(`Request for ${buttonId} already in progress. Ignoring.`);
+        console.warn(`API isteği (${buttonId} için) zaten devam ediyor. Yenisi yoksayıldı.`);
         return; // Bu buton için zaten bir istek devam ediyorsa yenisini başlatma
     }
 
@@ -62,7 +101,7 @@ function makeApiRequest(endpoint, method, data, successCallback, errorCallback, 
         $buttonToDisable.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> İşleniyor...');
     }
 
-    // API_APP_BASE_URL'nin sonunda / olup olmadığını kontrol etmeden birleştirme
+    // API endpoint URL'sini oluşturma
     let fullUrl;
     if (endpoint.startsWith(API_APP_BASE_URL) || endpoint.startsWith('/api/')) {
         fullUrl = endpoint;
@@ -70,7 +109,6 @@ function makeApiRequest(endpoint, method, data, successCallback, errorCallback, 
         fullUrl = `${API_APP_BASE_URL}/${endpoint.startsWith('/') ? endpoint.substring(1) : endpoint}`;
     }
     fullUrl = fullUrl.replace(/\/+/g, '/'); // Birden fazla slash'ı tek slash'e indirge
-    // console.debug("Requesting URL:", fullUrl, "Method:", method, "Data:", data);
 
     const requestSettings = {
         url: fullUrl,
@@ -91,11 +129,12 @@ function makeApiRequest(endpoint, method, data, successCallback, errorCallback, 
                 if(buttonId) delete isApiRequestInProgress[buttonId];
             }
             let errorMessage = `API isteği başarısız oldu (${xhr.status}).`;
+            // Hata mesajını xhr.responseJSON'dan daha detaylı almaya çalış
+
             if (xhr.responseJSON) {
                 if (xhr.responseJSON.detail) { errorMessage = xhr.responseJSON.detail; }
                 else if (Array.isArray(xhr.responseJSON)) { errorMessage = xhr.responseJSON.map(err => typeof err === 'object' ? JSON.stringify(err) : err).join(' '); }
                 else if (typeof xhr.responseJSON === 'object') { 
-                    // Django Rest Framework ValidationError için daha detaylı mesaj oluşturma
                     errorMessage = Object.entries(xhr.responseJSON).map(([key, value]) => {
                         let fieldError = Array.isArray(value) ? value.join(', ') : value;
                         return `${key !== 'non_field_errors' ? `${key}: ${fieldError}` : fieldError}`; 
@@ -112,7 +151,7 @@ function makeApiRequest(endpoint, method, data, successCallback, errorCallback, 
             else if (xhr.statusText && xhr.statusText !== "error") { errorMessage = `Hata ${xhr.status}: ${xhr.statusText}`; }
             
             console.error("API Error:", xhr.status, errorMessage, xhr.responseText); 
-            if (errorCallback) errorCallback(errorMessage, xhr); // xhr'ı da gönderelim ki callback içinde responseJSON'a erişilebilsin
+            if (errorCallback) errorCallback(errorMessage, xhr);
             else if (errorMessage && xhr.status !== 401 && xhr.status !== 0) {
                 if (window.location.pathname !== LOGIN_PAGE_URL) { alert(errorMessage); }
                 else if ($('#loginError').length) { $('#loginError').text(errorMessage); }
@@ -120,6 +159,8 @@ function makeApiRequest(endpoint, method, data, successCallback, errorCallback, 
             }
         }
     };
+
+    // POST, PUT, PATCH istekleri için data'yı JSON olarak ayarla
     if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
         requestSettings.data = JSON.stringify(data);
         requestSettings.contentType = 'application/json; charset=utf-8';
@@ -129,10 +170,17 @@ function makeApiRequest(endpoint, method, data, successCallback, errorCallback, 
     $.ajax(requestSettings);
 }
 
-// Giriş ve Kullanıcı Yönetimi
+// =================================================================================
+// AUTHENTICATION & USER SESSION MANAGEMENT
+// =================================================================================
+
+/**
+ * Giriş formu gönderildiğinde çalışır. API_LOGIN_URL'e istek yapar.
+ * @param {Event} event Form submit olayı.
+ */
 function handleLoginSubmit(event) {
-    event.preventDefault(); // Formun normal submit olmasını engelle
-    const $button = $('#loginButton'); // Butonu seç
+    event.preventDefault();
+    const $button = $('#loginButton');
     const originalButtonText = $button.html();
     const username = $('#username').val();
     const password = $('#password').val();
@@ -140,7 +188,6 @@ function handleLoginSubmit(event) {
     
     // Butonu manuel olarak devre dışı bırak ve spinner göster, çünkü bu fonksiyon makeApiRequest kullanmıyor, doğrudan $.ajax kullanıyor.
     $button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Giriş Yapılıyor...');
-    // showSpinner(); // Genel spinner'ı buradan kaldırıyoruz, buton üzerindeki yeterli.
  
     $.ajax({
         url: API_LOGIN_URL,
@@ -153,7 +200,6 @@ function handleLoginSubmit(event) {
         },
         error: function(xhr) {
             $button.prop('disabled', false).html(originalButtonText); 
-            // hideSpinner(); // Genel spinner kaldırıldığı için buna da gerek yok.
             let errorMsg = 'Giriş başarısız. Lütfen bilgilerinizi kontrol edin.';
             if (xhr.responseJSON && xhr.responseJSON.non_field_errors) {
                 errorMsg = xhr.responseJSON.non_field_errors.join(', ');
@@ -165,16 +211,19 @@ function handleLoginSubmit(event) {
     });
 }
 
+/**
+ * Mevcut kullanıcı bilgilerini API_USER_ME_URL'den çeker ve başarılı olursa yönlendirme yapar.
+ * @param {jQuery|null} [$button=null] Devre dışı bırakılacak buton (opsiyonel, genellikle giriş butonu).
+ * @param {string} [originalButtonText="Giriş Yap"] Butonun orijinal metni.
+ */
 function fetchCurrentUserInfoAndRedirect($button = null, originalButtonText = "Giriş Yap") {
     if (!authToken) {
         if ($button) { $button.prop('disabled', false).html(originalButtonText); }
-        // hideSpinner(); // makeApiRequest kendi spinner'ını yönetir, butonu zaten handleLoginSubmit yönetiyor.
         if (window.location.pathname !== LOGIN_PAGE_URL) {
             window.location.href = LOGIN_PAGE_URL + "?next=" + encodeURIComponent(window.location.pathname + window.location.search);
         }
         return;
     }
-    // makeApiRequest fonksiyonu spinner ve buton durumunu kendisi yönetecek.
     makeApiRequest(API_USER_ME_URL, 'GET', null,
         function(response) { // successCallback
             currentUser = response;
@@ -190,7 +239,6 @@ function fetchCurrentUserInfoAndRedirect($button = null, originalButtonText = "G
             } else if (window.location.pathname !== LOGIN_PAGE_URL) {
                 window.location.href = LOGIN_PAGE_URL;
             }
-            // Buton durumu ve spinner makeApiRequest tarafından zaten yönetiliyor.
         },
         true, // showLoading
         $button, // $buttonToDisable
@@ -198,17 +246,25 @@ function fetchCurrentUserInfoAndRedirect($button = null, originalButtonText = "G
     );
 }
 
+/**
+ * Kullanıcı oturumunu sonlandırır ve giriş sayfasına yönlendirir.
+ */
 function handleLogout() {
     authToken = null; currentUser = null;
     localStorage.removeItem('authToken'); localStorage.removeItem('currentUser');
     window.location.href = LOGIN_PAGE_URL;
 }
 
+// =================================================================================
+// UI MANAGEMENT & NAVIGATION
+// =================================================================================
+
 /**
  * Kullanıcı bilgilerini ve rollerini arayüzde günceller.
+ * Eğer `currentUser` global değişkeni boşsa API'den çekmeye çalışır.
  */
 function updateUserInfoDisplayAndMenus() {
-    if (!currentUser && authToken) {
+    if (!currentUser && authToken) { // Kullanıcı bilgisi yok ama token var ise API'den çek
         makeApiRequest(API_USER_ME_URL, 'GET', null,
             function(response) {
                 currentUser = response; localStorage.setItem('currentUser', JSON.stringify(currentUser));
@@ -227,6 +283,7 @@ function updateUserInfoDisplayAndMenus() {
 
 /**
  * Mevcut kullanıcı bilgilerine göre arayüzdeki menüleri ve içerik görünürlüğünü ayarlar.
+ * `.user-role-menu` ve `.user-role-content` class'larına sahip elementleri yönetir.
  */
 function applyUserRolesToUI() {
     if (!currentUser) return;
@@ -243,8 +300,7 @@ function applyUserRolesToUI() {
     }
     $('#currentUserRole').text(roleDisplay);
 
-    // Eğer hash yoksa ve aktif bir sayfa içeriği seçilmemişse,
-    // kullanıcının rolüne göre görünür olan ilk menü öğesini varsayılan olarak yükle.
+    // Kullanıcı rolüne göre menü ve içerik gösterimi
     if (!window.location.hash && $('.page-content.active').length === 0) {
         const firstVisibleMenuTarget = $('.user-role-menu:visible').first().find('.page-link').data('target') || 'dashboardContent';
         loadContent(firstVisibleMenuTarget);
@@ -253,6 +309,8 @@ function applyUserRolesToUI() {
 
 /**
  * İlgili içerik bölümünü yükler ve gösterir, sidebar'daki linki aktif hale getirir.
+ * URL hash'ini günceller ve içerik ID'sine göre ilgili veri yükleme fonksiyonlarını çağırır.
+ * @param {string} contentId Gösterilecek içerik bölümünün ID'si (örn: "workOrdersContent").
  */
 function loadContent(contentId) {
     if (!contentId) contentId = 'dashboardContent';
@@ -274,10 +332,10 @@ function loadContent(contentId) {
     else if (contentId === 'aircraftsContent' && (currentUser?.is_staff || currentUser?.is_superuser || currentUser?.personnel_profile?.team_type === 'ASSEMBLY_TEAM')) { 
         populateAircraftFilters();
         fetchAircrafts(); 
-    } // Montajcıyı da partsContent'e dahil et
+    }
     else if (contentId === 'partsContent' && (currentUser?.is_staff || currentUser?.is_superuser || currentUser?.personnel_profile?.team_type === 'ASSEMBLY_TEAM')) { 
-        populateAdminPartFilters(); // Admin ve Montajcı aynı filtreleri kullanabilir
-        fetchParts(); // fetchParts, adminPartsDataTable'ı kullanır, bu montajcı için de geçerli olacak
+        populateAdminPartFilters();
+        fetchParts();
     }
     else if (contentId === 'assignedWorkOrdersContent' && currentUser?.personnel_profile?.team_type === 'ASSEMBLY_TEAM') { fetchAssignedWorkOrders(); }
     else if (contentId === 'assembleAircraftContent' && currentUser?.personnel_profile?.team_type === 'ASSEMBLY_TEAM') { populateAssembleAircraftFormDropdowns(); }
@@ -290,8 +348,14 @@ function loadContent(contentId) {
     }
 }
 
+// =================================================================================
+// DATA FETCHING & DATATABLE INITIALIZATION
+// =================================================================================
+
 /**
- * İş emirlerini DataTables kullanarak listeler. Sunucu tarafı (server-side) işleme kullanır.
+ * İş emirlerini API'den (`work-orders/`) çekerek DataTables ile listeler.
+ * Sunucu tarafı (server-side) işleme, sıralama, arama ve filtreleme özelliklerini destekler.
+ * Sadece Admin/Staff kullanıcıları için çalışır.
  */
 function fetchWorkOrders() {
     const workOrderTableElement = $('#workOrdersTable');
@@ -308,7 +372,7 @@ function fetchWorkOrders() {
         return;
     }
     
-    console.info("Initializing WorkOrders DataTable...");
+    console.info("WorkOrders DataTable başlatılıyor...");
     workOrdersDataTable = workOrderTableElement.DataTable({
         processing: true,
         serverSide: true,
@@ -317,8 +381,8 @@ function fetchWorkOrders() {
             type: "GET",
             headers: { 'Authorization': authToken ? `Token ${authToken}` : '' },
             data: function (d) {
-                const drfParams = { // Django Rest Framework'ün beklediği parametreler
-                    length: d.length === -1 ? 999999 : d.length, // "Tümü" için büyük bir limit
+                const drfParams = { 
+                    length: d.length === -1 ? 999999 : d.length,
                     start: d.start,
                     draw: d.draw 
                 };
@@ -329,7 +393,7 @@ function fetchWorkOrders() {
                     const orderColumnIndex = d.order[0].column;
                     const orderDirection = d.order[0].dir;
                     let orderColumnName = d.columns[orderColumnIndex].data; 
-                    const orderingFieldMap = { // DataTables kolon adlarını Django model alan adlarına eşle
+                    const orderingFieldMap = { 
                         'aircraft_model_name': 'aircraft_model__name',
                         'status_display': 'status',
                         'assigned_to_assembly_team_name': 'assigned_to_assembly_team__name',
@@ -348,7 +412,7 @@ function fetchWorkOrders() {
                 return drfParams;
             },
             error: function (xhr, error, thrown) {
-                hideSpinner(); // Spinner'ı gizle (DataTables kendi spinner'ını yönetebilir ama bu genel bir önlem)
+                hideSpinner(); 
                 let errorMsg = "İş emirleri DataTable ile yüklenirken bir hata oluştu.";
                 if (xhr.responseJSON && xhr.responseJSON.detail) { errorMsg = xhr.responseJSON.detail;}
                 else if (xhr.status === 403) { errorMsg = "İş emirlerini görüntüleme yetkiniz yok.";}
@@ -358,7 +422,7 @@ function fetchWorkOrders() {
                 console.error("DataTable Ajax Error:", xhr.status, errorMsg, xhr.responseText);
             }
         },
-        columns: [ /* ... (Bir önceki mesajdaki columns tanımınız doğruydu) ... */
+        columns: [
             { data: "id", title: "ID", width: "5%" },
             { data: "aircraft_model_name", title: "Uçak Modeli", defaultContent: "-" },
             { data: "quantity", title: "Miktar" },
@@ -402,7 +466,11 @@ function fetchWorkOrders() {
     });
 }
 
-function fetchParts() { // Admin için tüm parçalar
+/**
+ * Tüm parçaları API'den (`parts/`) çekerek DataTables ile listeler.
+ * Admin ve Montajcılar için kullanılır. Sunucu tarafı işleme, sıralama, arama ve filtreleme destekler.
+ */
+function fetchParts() {
     const partTableElement = $('#adminPartsTable');
     $('#adminPartsAlerts').empty();
 
@@ -419,7 +487,7 @@ function fetchParts() { // Admin için tüm parçalar
             headers: { 'Authorization': authToken ? `Token ${authToken}` : '' },
             data: function (d) {
                 let drfParams = {
-                    length: d.length === -1 ? 10000 : d.length, // "Tümü" için makul bir limit
+                    length: d.length === -1 ? 99999 : d.length,
                     start: d.start,
                     draw: d.draw
                 };
@@ -428,7 +496,7 @@ function fetchParts() { // Admin için tüm parçalar
                     const colIndex = d.order[0].column;
                     const colDir = d.order[0].dir;
                     const colName = d.columns[colIndex].data;
-                    const fieldMap = { /* ... (PartSerializer'daki display alanları için map) ... */
+                    const fieldMap = {
                         'part_type_display': 'part_type__category',
                         'aircraft_model_compatibility_name': 'aircraft_model_compatibility__name',
                         'produced_by_team_name': 'produced_by_team__name',
@@ -439,7 +507,7 @@ function fetchParts() { // Admin için tüm parçalar
                     let sortableField = fieldMap[colName] || colName;
                     if (sortableField) drfParams.ordering = (colDir === 'desc' ? '-' : '') + sortableField;
                 }
-                // Filtreleri ekle
+                // Parça filtrelerini ekle (durum, kategori, uçak modeli)
                 if ($('#adminPartStatusFilter').val()) drfParams.status = $('#adminPartStatusFilter').val();
                 if ($('#adminPartCategoryFilter').val()) drfParams.part_type = $('#adminPartCategoryFilter').val(); // PartType ID'si
                 if ($('#adminPartAircraftModelFilter').val()) drfParams.aircraft_model_compatibility = $('#adminPartAircraftModelFilter').val();
@@ -492,6 +560,10 @@ function fetchParts() { // Admin için tüm parçalar
     });
 }
 
+/**
+ * Üretimci personelin kendi takımının ürettiği parçaları API'den (`parts/`) çekerek DataTables ile listeler.
+ * Backend, isteği yapan kullanıcıya göre filtreleme yapar. Sunucu tarafı işleme destekler.
+ */
 function fetchMyTeamParts() { // Üretimci için kendi takımının parçaları
     const partTableElement = $('#myTeamPartsTable');
     $('#myTeamPartsAlerts').empty();
@@ -504,11 +576,11 @@ function fetchMyTeamParts() { // Üretimci için kendi takımının parçaları
         processing: true,
         serverSide: true,
         ajax: {
-            url: `${API_APP_BASE_URL}parts/`, // get_queryset zaten takıma göre filtreliyor
+            url: `${API_APP_BASE_URL}parts/`,
             type: "GET",
             headers: { 'Authorization': authToken ? `Token ${authToken}` : '' },
             data: function (d) {
-                let drfParams = { /* ... (fetchParts'taki gibi, ama team_id filtresi backend'den) ... */
+                let drfParams = {
                     length: d.length === -1 ? 10000 : d.length,
                     start: d.start,
                     draw: d.draw
@@ -536,10 +608,9 @@ function fetchMyTeamParts() { // Üretimci için kendi takımının parçaları
                 $('#myTeamPartsAlerts').html(`<div class="alert alert-danger">${errorMsg}</div>`);
             }
         },
-        columns: [ /* ... (fetchParts'taki gibi, ama belki 'Üreten Takım' sütunu gereksiz) ... */
+        columns: [ 
             { data: "id", title: "ID" },
             { data: "serial_number", title: "Seri No" },
-            // { data: "part_type_display", title: "Parça Tipi" }, // Zaten kendi ürettiği tip
             { data: "aircraft_model_compatibility_name", title: "Uyumlu Model", defaultContent: "-" },
             { data: "status_display", title: "Durum", render: function(data, type, row){ /* badge render */ 
                 let badgeClass = 'bg-light text-dark'; 
@@ -571,6 +642,10 @@ function fetchMyTeamParts() { // Üretimci için kendi takımının parçaları
     });
 }
 
+/**
+ * Hava araçlarını API'den (`aircraft/`) çekerek DataTables ile listeler.
+ * Admin, Staff ve Montajcılar için kullanılır. Sunucu tarafı işleme, sıralama, arama ve filtreleme destekler.
+ */
 function fetchAircrafts() {
     const aircraftTableElement = $('#aircraftsTable');
     $('#aircraftsAlerts').empty();
@@ -588,7 +663,7 @@ function fetchAircrafts() {
             headers: { 'Authorization': authToken ? `Token ${authToken}` : '' },
             data: function (d) {
                 let drfParams = {
-                    length: d.length === -1 ? 10000 : d.length,
+                    length: d.length === -1 ? 99999 : d.length,
                     start: d.start,
                     draw: d.draw
                 };
@@ -601,12 +676,12 @@ function fetchAircrafts() {
                         'aircraft_model_name': 'aircraft_model__name',
                         'status_display': 'status',
                         'assembled_by_team_name': 'assembled_by_team__name',
-                        'work_order_id_display': 'work_order__id' // work_order_id_display diye bir alan yok, direkt id
+                        'work_order_id_display': 'work_order__id'
                     };
                     let sortableField = fieldMap[colName] || colName;
                     if (sortableField) drfParams.ordering = (colDir === 'desc' ? '-' : '') + sortableField;
                 }
-                // Filtreleri ekle
+                // Hava aracı filtrelerini ekle (durum, model, takım)
                 if ($('#aircraftStatusFilter').val()) drfParams.status = $('#aircraftStatusFilter').val();
                 if ($('#aircraftModelFilter').val()) drfParams.aircraft_model = $('#aircraftModelFilter').val();
                 if (currentUser && (currentUser.is_staff || currentUser.is_superuser) && $('#aircraftTeamFilter').val()) {
@@ -616,7 +691,7 @@ function fetchAircrafts() {
             },
             error: function (xhr) {
                 hideSpinner();
-                let errorMsg = "Uçaklar yüklenirken hata oluştu."; /* ... (detaylı hata mesajı) ... */
+                let errorMsg = "Uçaklar yüklenirken hata oluştu."; 
                 $('#aircraftsAlerts').html(`<div class="alert alert-danger">${errorMsg}</div>`);
             }
         },
@@ -639,7 +714,7 @@ function fetchAircrafts() {
             { data: "assembled_by_team_name", title: "Montaj Takımı", defaultContent: "-" },
             { data: "assembly_date", title: "Montaj Tarihi", render: function(data) { return data ? new Date(data).toLocaleDateString('tr-TR') : '-'; }},
             { data: "work_order_id_display", title: "İş Emri ID", defaultContent: "-", render: function(data, type, row){ return row.work_order || '-';}},
-            {
+            {// İşlem butonları (Geri Dönüştür)
                 data: null, title: "İşlemler", orderable: false, searchable: false,
                 render: function (data, type, row) {
                     let buttons = '';
@@ -689,7 +764,7 @@ function createAircraftModelSelector(containerId, modelsData, inputRadioName, is
         container.addClass('row g-2 aircraft-model-selector-grid'); 
         models.forEach(model => {
             const isChecked = model.id == selectedValue ? 'checked' : '';
-            const uniqueRadioId = `${inputRadioName}_${model.id}`; // Her radyo butonu için benzersiz ID
+            const uniqueRadioId = `${inputRadioName}_${model.id}`;
 
             container.append(`
                 <div class="col-6 col-md-4 col-lg-3 mb-2">
@@ -703,7 +778,6 @@ function createAircraftModelSelector(containerId, modelsData, inputRadioName, is
                 </div>
             `);
         });
-        // Kartlara tıklandığında seçimi yönetmek için event delegation (kartlar dinamik eklendiği için)
         container.off('click', '.aircraft-model-card').on('click', '.aircraft-model-card', function() {
             // Aynı gruptaki diğer seçimleri kaldır
             $(`input[name="${inputRadioName}"]`).closest('.aircraft-model-card').removeClass('selected');
@@ -760,8 +834,12 @@ function populateWorkOrderFormDropdowns(editData = null) {
     }
 }
 
+// =================================================================================
+// FORM SUBMISSION HANDLERS
+// =================================================================================
+
 /**
- * Yeni bir iş emri oluşturur veya mevcut bir iş emrini günceller.
+ * Yeni bir iş emri oluşturur (POST `work-orders/`) veya mevcut bir iş emrini günceller (PUT `work-orders/{id}/`).
  * @param {string|number|null} [workOrderId=null] Güncellenecek iş emrinin ID'si. Yoksa yeni oluşturulur.
  * @param {jQuery} $triggerButton İsteği tetikleyen buton (devre dışı bırakma ve metin güncelleme için).
  */
@@ -792,8 +870,8 @@ function saveWorkOrder(workOrderId = null, $triggerButton) {
             $('#workOrderAlerts').html(`<div class="alert alert-success alert-dismissible fade show" role="alert">İş emri başarıyla ${workOrderId ? 'güncellendi' : 'oluşturuldu'}.<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>`);
             if (workOrdersDataTable) { workOrdersDataTable.ajax.reload(null, false); }
         },
-        function(errorMsg, xhr) { // xhr'ı da alalım
-            let displayError = errorMsg; // makeApiRequest'ten gelen genel mesaj
+        function(errorMsg, xhr) {
+            let displayError = errorMsg;
             // xhr.responseJSON içindeki hataları daha iyi formatlayabiliriz
             if (xhr.responseJSON) {
                 displayError = Object.entries(xhr.responseJSON).map(([key, value]) => `${key !== 'non_field_errors' ? (key + ': ') : ''}${Array.isArray(value) ? value.join(', ') : value}`).join('; ');
@@ -804,8 +882,13 @@ function saveWorkOrder(workOrderId = null, $triggerButton) {
     );
 }
 
+// =================================================================================
+// ACTION HANDLERS (DELETE, RECYCLE, ETC.)
+// =================================================================================
+
 /**
- * Belirtilen ID'ye sahip iş emrini iptal eder (DELETE isteği gönderir).
+ * Belirtilen ID'ye sahip iş emrini iptal eder (DELETE `work-orders/{id}/`).
+ * Kullanıcıdan onay alır.
  * @param {string|number} workOrderId İptal edilecek iş emrinin ID'si.
  */
 function deleteWorkOrder(workOrderId) {
@@ -821,8 +904,13 @@ function deleteWorkOrder(workOrderId) {
     );
 }
 
+// =================================================================================
+// DASHBOARD & STOCK MANAGEMENT
+// =================================================================================
+
 /**
- * Stok seviyelerini (parça ve uçak stokları) API'den çeker ve görüntüler.
+ * Stok seviyelerini (parça ve uçak stokları) API'den (`inventory/stock-levels/`) çeker ve DataTables ile görüntüler.
+ * Parça stokları herkes için, uçak stokları Admin/Staff/Montajcı için gösterilir.
  */
 function fetchStockLevels() {
     // Parça Stokları DataTable
@@ -837,7 +925,6 @@ function fetchStockLevels() {
                 headers: { 'Authorization': authToken ? `Token ${authToken}` : '' },
                 data: function (d) {
                     d.stock_type = 'parts';
-                    // Gerekirse buraya ek filtreler (uçak modeli, parça tipi) eklenebilir.
                     return d;
                 },
                 error: function (xhr) { $('#partStockAlerts').html(`<div class="alert alert-danger">Parça stokları yüklenemedi: ${xhr.responseText}</div>`); }
@@ -854,9 +941,9 @@ function fetchStockLevels() {
                 }
             ],
             order: [[0, 'asc'], [1, 'asc']], language: { url: DATATABLES_TR_JSON_URL }, responsive: true, 
-            pageLength: -1, // Tüm kayıtları göster
-            lengthChange: false, // "Sayfada x kayıt göster" dropdown'ını gizle
-            searching: false, // Şimdilik arama kapalı, gerekirse eklenebilir
+            pageLength: -1,
+            lengthChange: false,
+            searching: false,
         });
     }
 
@@ -874,25 +961,20 @@ function fetchStockLevels() {
                     headers: { 'Authorization': authToken ? `Token ${authToken}` : '' },
                     data: function (d) {
                         d.stock_type = 'aircrafts';
-                        // Gerekirse buraya ek filtreler (uçak modeli) eklenebilir.
                         return d;
                     },
                     error: function (xhr) { $('#aircraftStockAlerts').html(`<div class="alert alert-danger">Uçak stokları yüklenemedi: ${xhr.responseText}</div>`); }
                 },
-                columns: [ // Sütun başlıkları AircraftStatusChoices'a göre olmalı
-                    // models.py: ACTIVE = "AVAILABLE", "Hazır"
-                    // models.py: SOLD = "SOLD", "Satıldı"
-                    // models.py: MAINTENANCE = "MAINTENANCE", "Bakımda"
-                    // models.py: RECYCLED = "RECYCLED", "Geri dönüştürüldü"
+                columns: [
                     { data: "aircraft_model_name", title: "Uçak Modeli" },
-                    { data: "AVAILABLE", title: "Hazır (Aktif)" }, // models.py'de ACTIVE -> AVAILABLE olarak tanımlı
+                    { data: "AVAILABLE", title: "Hazır (Aktif)" },
                     { data: "SOLD", title: "Satıldı" },
                     { data: "MAINTENANCE", title: "Bakımda" },
                     { data: "RECYCLED", title: "Geri Dönüştürülmüş" }
                 ],
                 order: [[0, 'asc']], language: { url: DATATABLES_TR_JSON_URL }, responsive: true, 
-                pageLength: -1, // Tüm kayıtları göster
-                lengthChange: false, // "Sayfada x kayıt göster" dropdown'ını gizle
+                pageLength: -1,
+                lengthChange: false,
                 searching: false, 
             });
         }
@@ -901,8 +983,12 @@ function fetchStockLevels() {
     }
 }
 
+// =================================================================================
+// FORM POPULATION (SPECIFIC FORMS)
+// =================================================================================
+
 /**
- * Uçak montaj formu için gerekli dropdown'ları (uçak modelleri, uygun iş emirleri) doldurur.
+ * "Uçak Montaj" formu için gerekli alanları (uçak modelleri, uygun iş emirleri) API'den çekerek doldurur.
  */
 function populateAssembleAircraftFormDropdowns() {
     // Uçak Modelleri (Görsel Seçici)
@@ -941,7 +1027,7 @@ function populateMyTeamPartFilters() {
 function populateAdminPartFilters() {
     // Parça Kategorileri
     makeApiRequest('part-types/', 'GET', null, function(response) {
-        const categories = response.data || response; // Pagination durumuna göre
+        const categories = response.data || response;
         const select = $('#adminPartCategoryFilter');
         select.empty().append('<option value="">Tüm Kategoriler</option>');
         if(Array.isArray(categories)) {
@@ -991,7 +1077,8 @@ function populateAircraftFilters() {
 }
 
 /**
- * Uçak montaj formunun gönderilmesini yönetir.
+ * "Uçak Montaj" formunun gönderilmesini yönetir.
+ * API'ye (`assembly/assemble-aircraft/`) POST isteği yapar.
  * @param {Event} event Form submit olayı.
  */
 function handleAssembleAircraftFormSubmit(event) {
@@ -1019,7 +1106,7 @@ function handleAssembleAircraftFormSubmit(event) {
             if ($('#stockLevelsContent').is(':visible')) fetchStockLevels();
             if ($('#aircraftsContent').is(':visible')) fetchAircrafts();
         }, // Hata durumunda gösterilecek mesaj için errorCallback
-        function(errorMsg, xhr) { // xhr'ı da alalım
+        function(errorMsg, xhr) {
             let detailedError = "Montaj sırasında bir hata oluştu.";
             if (xhr.responseJSON) {
                 if (xhr.responseJSON.error && xhr.responseJSON.missing_parts && Array.isArray(xhr.responseJSON.missing_parts)) {
@@ -1039,7 +1126,7 @@ function handleAssembleAircraftFormSubmit(event) {
 }
 
 /**
- * Parça üretim formu için uçak modeli seçicisini doldurur.
+ * "Parça Üretim" formu için uçak modeli seçicisini API'den (`aircraft-models/`) veri çekerek doldurur.
  */
 function populateProducePartFormDropdowns() {
     makeApiRequest(`aircraft-models/`, 'GET', null, function(modelsResponse) {
@@ -1050,7 +1137,8 @@ function populateProducePartFormDropdowns() {
 }
 
 /**
- * Parça üretim formunun gönderilmesini yönetir.
+ * "Parça Üretim" formunun gönderilmesini yönetir.
+ * API'ye (`parts/`) POST isteği yapar.
  * @param {Event} event Form submit olayı.
  */
 function handleProducePartFormSubmit(event) {
@@ -1090,8 +1178,14 @@ function handleProducePartFormSubmit(event) {
     );
 }
 
-// Aşağıdaki fonksiyonlar henüz tam olarak implemente edilmemiş, verileri çekip konsola yazdırıyorlar.
-// Gerçek uygulamada bu verilerin tablo veya liste olarak gösterilmesi beklenir.
+// =================================================================================
+// SPECIFIC DATA VIEWS (Assigned Work Orders, Personnel, Teams)
+// =================================================================================
+
+/**
+ * Montajcı personele atanmış (veya atanabilecek) iş emirlerini API'den (`work-orders/`) çekerek DataTables ile listeler.
+ * Backend, isteği yapan kullanıcıya göre filtreleme yapar. Sunucu tarafı işleme destekler.
+ */
 function fetchAssignedWorkOrders() {
     const tableElement = $('#assignedWorkOrdersTable');
     $('#assignedWorkOrderAlerts').empty();
@@ -1112,12 +1206,12 @@ function fetchAssignedWorkOrders() {
         processing: true,
         serverSide: true,
         ajax: {
-            url: `${API_APP_BASE_URL}work-orders/`, // Backend get_queryset montajcı için filtreleyecek
+            url: `${API_APP_BASE_URL}work-orders/`,
             type: "GET",
             headers: { 'Authorization': authToken ? `Token ${authToken}` : '' },
-            data: function (d) { // Standart DataTable parametreleri
+            data: function (d) {
                 const drfParams = {
-                    length: d.length === -1 ? 999999 : d.length,
+                    length: d.length === -1 ? 99999 : d.length,
                     start: d.start,
                     draw: d.draw 
                 };
@@ -1136,22 +1230,21 @@ function fetchAssignedWorkOrders() {
                         drfParams.ordering = (orderDirection === 'desc' ? '-' : '') + sortableFieldName;
                     }
                 }
-                // Montajcı için ek bir durum filtresi gerekirse buraya eklenebilir,
-                // ancak backend zaten PENDING, ASSIGNED, IN_PROGRESS durumlarını gösteriyor.
+
                 return drfParams;
             },
             error: function (xhr) {
                 hideSpinner();
                 let errorMsg = "Atanmış iş emirleri yüklenirken bir hata oluştu.";
-                /* ... (detaylı hata mesajı) ... */
+
                 $('#assignedWorkOrderAlerts').html(`<div class="alert alert-danger">${errorMsg}</div>`);
             }
         },
-        columns: [ // Admin tablosuna benzer sütunlar, "İşlemler" farklı olabilir
+        columns: [
             { data: "id", title: "ID" },
             { data: "aircraft_model_name", title: "Uçak Modeli", defaultContent: "-" },
             { data: "quantity", title: "Miktar" },
-            { data: "status_display", title: "Durum", render: function(data, type, row){ /* badge render */ 
+            { data: "status_display", title: "Durum", render: function(data, type, row){ 
                 let badgeClass = 'bg-light text-dark'; 
                 if (row.status === 'PENDING') badgeClass = 'bg-warning text-dark';
                 else if (row.status === 'ASSIGNED') badgeClass = 'bg-primary text-white';
@@ -1170,19 +1263,20 @@ function fetchAssignedWorkOrders() {
     });
 }
 
-// Ana Panel için Stok Uyarılarını StockLevelsAPIView'dan Çekerek Göster
+/**
+ * Ana panel (dashboard) için stok uyarılarını API'den (`inventory/stock-levels/`) çekerek gösterir.
+ * Sadece kritik (tükenmiş) stokları listeler. Datatable uyumludur.
+ */
 function displayDashboardStockWarningsFromStockLevelsAPI() {
-    // StockLevelsAPIView tüm parça stoklarını çekmek için length: -1 (veya büyük bir sayı) ve start: 0 göndermeli.
-    // Bu API DataTable için tasarlandığından, tüm veriyi çekmek için bu parametreler önemli.
     const params = {
         stock_type: 'parts',
-        length: -1, // Tüm kayıtları çekmek için
+        length: -1,
         start: 0
     };
 
     makeApiRequest('inventory/stock-levels/', 'GET', params, 
         function(response) {
-            const stockData = response.data || []; // StockLevelsAPIView 'data' key'i altında listeyi döner
+            const stockData = response.data || []; 
             let collectedWarnings = [];
 
             stockData.forEach(item => {
@@ -1204,7 +1298,7 @@ function displayDashboardStockWarningsFromStockLevelsAPI() {
 
             if (targetListId) {
                 const $list = $(targetListId);
-                $list.empty(); // Önceki uyarıları temizle
+                $list.empty();
                 if (collectedWarnings.length > 0) {
                     collectedWarnings.forEach(warning => {
                         $list.append(`<li class="alert alert-danger">${warning}</li>`);
@@ -1220,7 +1314,10 @@ function displayDashboardStockWarningsFromStockLevelsAPI() {
         }, false); // Arka planda sessizce yüklensin, ana spinner'ı tetiklemesin
 }
 
-// Personel Yönetimi Fonksiyonları (Taslak)
+/**
+ * Personel listesini API'den (`personnel/`) çekerek DataTables ile listeler.
+ * Sadece Admin/Staff kullanıcıları için çalışır. Sunucu tarafı işleme destekler.
+ */
 function fetchPersonnel() {
     const tableElement = $('#personnelTable');
     $('#personnelAlerts').empty();
@@ -1234,7 +1331,7 @@ function fetchPersonnel() {
             url: `${API_APP_BASE_URL}personnel/`,
             type: "GET",
             headers: { 'Authorization': authToken ? `Token ${authToken}` : '' },
-            data: function(d) { /* DRF için parametreler */ return d; },
+            data: function(d) {  return d; },
             error: function(xhr) { $('#personnelAlerts').html(`<div class="alert alert-danger">Personel listesi yüklenemedi.</div>`); }
         },
         columns: [
@@ -1253,6 +1350,11 @@ function fetchPersonnel() {
     });
 }
 
+/**
+ * Personel düzenleme (takım atama/değiştirme) modalını açar ve doldurur.
+ * Yeni personel ekleme işlevselliği kaldırılmıştır.
+ * @param {string|number} personnelUserId Düzenlenecek personelin User ID'si.
+ */
 function openPersonnelModal(personnelUserId = null) { // personnelUserId burada User ID'dir
     // Bu fonksiyon artık sadece mevcut personelin takımını düzenlemek için kullanılacak.
     $('#personnelForm')[0].reset();
@@ -1292,6 +1394,9 @@ function openPersonnelModal(personnelUserId = null) { // personnelUserId burada 
     $('#personnelModal').modal('show');
 }
 
+/**
+ * Personel bilgilerini (sadece takımını) günceller. API'ye (`personnel/{id}/`) PATCH isteği yapar.
+ */
 function savePersonnel() {
     const personnelUserId = $('#personnelId').val(); // Bu User ID
     if (!personnelUserId) {
@@ -1318,7 +1423,10 @@ function savePersonnel() {
     );
 }
 
-// Takım Yönetimi Fonksiyonları (Taslak)
+/**
+ * Takım listesini API'den (`teams/`) çekerek DataTables ile listeler.
+ * Sadece Admin/Staff kullanıcıları için çalışır. Sunucu tarafı işleme destekler.
+ */
 function fetchTeams() {
     const tableElement = $('#teamsTable');
     $('#teamAlerts').empty();
@@ -1327,12 +1435,12 @@ function fetchTeams() {
 
     teamsDataTable = tableElement.DataTable({
         processing: true,
-        serverSide: true, // TeamViewSet ModelViewSet ise serverSide true olabilir
+        serverSide: true,
         ajax: {
             url: `${API_APP_BASE_URL}teams/`,
             type: "GET",
             headers: { 'Authorization': authToken ? `Token ${authToken}` : '' },
-            data: function(d) { /* DRF için parametreler */ return d; },
+            data: function(d) {  return d; },
             error: function(xhr) { $('#teamAlerts').html(`<div class="alert alert-danger">Takım listesi yüklenemedi.</div>`); }
         },
         columns: [
@@ -1351,14 +1459,18 @@ function fetchTeams() {
     });
 }
 
+
+/**
+ * Yeni takım ekleme veya mevcut takımı düzenleme modalını açar ve doldurur.
+ * Takım tiplerini `DefinedTeamTypes` enum'una benzer bir yapıdan (veya API'den) alır.
+ * @param {string|number|null} [teamId=null] Düzenlenecek takımın ID'si. Yoksa yeni ekleme modunda açılır.
+ */
 function openTeamModal(teamId = null) {
     $('#teamForm')[0].reset(); // teamForm ID'li bir form olmalı modalda
     $('#teamId').val(''); // teamId input'u olmalı
     $('#teamFormError').text(''); // teamFormError div'i olmalı
 
     // Takım tiplerini doldur (DefinedTeamTypes modelinden)
-    // Bu tipleri base.html'de global bir JS değişkenine aktarabilir veya API'den çekebiliriz.
-    // Şimdilik sabit olarak ekliyorum, idealde dinamik olmalı.
     const teamTypes = {
         "WING_TEAM": "Kanat Takımı",
         "FUSELAGE_TEAM": "Gövde Takımı",
@@ -1367,7 +1479,7 @@ function openTeamModal(teamId = null) {
         "ASSEMBLY_TEAM": "Montaj Takımı"
     };
     const $teamTypeSelect = $('#teamTypeSelect');
-    $teamTypeSelect.empty().append('<option value="">Tip Seçiniz...</option>');
+    $teamTypeSelect.empty().append('<option value="">Tip Seçiniz:</option>');
     Object.entries(teamTypes).forEach(([key, value]) => $teamTypeSelect.append(`<option value="${key}">${value}</option>`));
 
     if (teamId) {
@@ -1383,6 +1495,9 @@ function openTeamModal(teamId = null) {
     $('#teamModal').modal('show');
 }
 
+/**
+ * Yeni bir takım oluşturur (POST `teams/`) veya mevcut bir takımı günceller (PUT `teams/{id}/`).
+ */
 function saveTeam() {
     const teamId = $('#teamId').val();
     const isEditMode = !!teamId;
@@ -1404,7 +1519,10 @@ function saveTeam() {
 
 
 
-// Sayfa Yüklendiğinde Çalışacaklar
+// =================================================================================
+// PAGE INITIALIZATION & EVENT LISTENERS
+// =================================================================================
+
 $(document).ready(function() {
     // Gerekli global değişkenlerin tanımlı olup olmadığını kontrol et
     if (typeof LOGIN_PAGE_URL === 'undefined' || typeof DASHBOARD_URL === 'undefined' || 
@@ -1439,8 +1557,6 @@ $(document).ready(function() {
     // Diğer sayfalar (genellikle public olmayan ve giriş gerektiren)
     else { 
         if (authToken && !currentUser) { fetchCurrentUserInfoAndRedirect(); }
-        // Eğer token yoksa ve public bir sayfa değilse (ve ana sayfa değilse) login'e yönlendirme düşünülebilir.
-        // Ancak mevcut mantık, dashboard dışındaki sayfalar için bu kontrolü yapmıyor gibi görünüyor.
     }
 
     // Dashboard'u başlatan ana fonksiyon
@@ -1454,10 +1570,6 @@ $(document).ready(function() {
             if (currentUser) {
             // Tüm roller için varsayılan olarak ana paneli aç
             initialContent = 'dashboardContent';
-            // İstenirse role özel varsayılanlar burada ayarlanabilir, ama şimdilik hepsi ana panel.
-            // if (currentUser.is_superuser || currentUser.is_staff) initialContent = 'dashboardContent';
-            // else if (currentUser.personnel_profile?.team_type === 'ASSEMBLY_TEAM') initialContent = 'dashboardContent'; // 'assignedWorkOrdersContent';
-            // else if (currentUser.personnel_profile && ['WING_TEAM', 'FUSELAGE_TEAM', 'TAIL_TEAM', 'AVIONICS_TEAM'].includes(currentUser.personnel_profile.team_type)) initialContent = 'dashboardContent'; // 'producePartContent';
         }
         }
         loadContent(initialContent);
@@ -1483,8 +1595,6 @@ $(document).ready(function() {
         });
 
         // Uçak Montaj ve Parça Üretim Formları
-        // ÖNEMLİ DÜZELTME: Bu event handler'lar zaten burada .off().on() ile doğru şekilde bağlanıyor.
-        // Aşağıdaki "Diğer form submit handler'ları" bloğundaki mükerrer .on() çağrıları kaldırıldı.
         $('#assembleAircraftForm').off('submit').on('submit', handleAssembleAircraftFormSubmit);
         $('#producePartForm').off('submit').on('submit', handleProducePartFormSubmit);
 
@@ -1498,7 +1608,7 @@ $(document).ready(function() {
                 function(errorMsg) { $('#workOrderAlerts').html(`<div class="alert alert-danger">Düzenlenecek iş emri verileri alınamadı: ${errorMsg}</div>`); }
             );
         });
-        // Yeni iş emri modalı kapandığında formu sıfırla
+        // İş emri modalı kapandığında formu sıfırla
         $('#newWorkOrderModal').on('hidden.bs.modal', function () {
             $('#newWorkOrderForm')[0].reset();
             $('#newWorkOrderModal').removeData('edit-id');
@@ -1506,7 +1616,7 @@ $(document).ready(function() {
             $('#woAircraftModelContainer').empty().removeClass('row g-2 aircraft-model-selector-grid'); // Model seçiciyi temizle
             $('#newWorkOrderError').text('');
         });
-        // --- YENİ: İş Emri Durum Filtresi Event Listener ---
+        //İş Emri Durum Filtresi Event Listener
         if ($('#workOrderStatusFilter').length) { // Eğer filtre dropdown'ı varsa
             $('#workOrderStatusFilter').on('change', function() {
                 if (workOrdersDataTable) {
@@ -1535,9 +1645,6 @@ $(document).ready(function() {
         });
 
         // Personel ve Takım Modal Açma Butonları
-        // $('#btnOpenNewPersonnelModal').on('click', function() {
-        //     openPersonnelModal(); // Bu buton kaldırıldı
-        // });
         $('#btnOpenNewTeamModal').on('click', function() { 
             openTeamModal(); // Takım modalını açmak için HTML'de teamForm, teamId, teamNameInput, teamTypeSelect, teamFormError elemanları olmalı
         });
@@ -1546,12 +1653,11 @@ $(document).ready(function() {
         $('body').off('click', '.btn-edit-personnel').on('click', '.btn-edit-personnel', function() {
             const personnelUserId = $(this).data('id');
             openPersonnelModal(personnelUserId);
-        }); // .btn-edit-personnel için listener sonu
+        });
+        
         $('body').off('click', '.btn-delete-personnel').on('click', '.btn-delete-personnel', function() {
             const personnelUserId = $(this).data('id');
             if (confirm(`Personel (Kullanıcı ID: ${personnelUserId}) ve ilişkili kullanıcı hesabı silinecek. Bu işlem geri alınamaz. Emin misiniz?`)) {
-                // Personnel silme işlemi User'ı da silmeli (CASCADE) veya User'ı pasif yapmalı.
-                // PersonnelViewSet'in destroy metodu bunu yönetmeli.
                 makeApiRequest(`personnel/${personnelUserId}/`, 'DELETE', null,
                     function() { if (personnelDataTable) personnelDataTable.ajax.reload(null, false); $('#personnelAlerts').html('<div class="alert alert-info">Personel silindi.</div>'); },
                     function(errorMsg) { $('#personnelAlerts').html(`<div class="alert alert-danger">Personel silinirken hata: ${errorMsg}</div>`); }
