@@ -1,0 +1,52 @@
+{% extends "aircraft_production_app/base.html" %}
+{% load static %}
+
+{% block title %}Kayıt Ol - {{ block.super }}{% endblock %}
+
+{% block body_content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <div class="text-center mb-3">
+                        <i class="fas fa-plane-departure fa-3x text-primary"></i>
+                        <h3 class="mt-2">Kayıt ol</h4>
+                    </div>
+                    <form id="registerForm">
+                        {% csrf_token %} {# Ajax için CSRF token'ı forma eklemek iyi bir pratiktir, JS'de de kullanılabilir #}
+                        <div class="mb-3">
+                            <label for="regUsername" class="form-label">Kullanıcı Adı</label>
+                            <input type="text" class="form-control" id="regUsername" name="username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="regEmail" class="form-label">E-posta Adresi</label>
+                            <input type="email" class="form-control" id="regEmail" name="email" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="regPassword" class="form-label">Şifre</label>
+                            <input type="password" class="form-control" id="regPassword" name="password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="regPassword2" class="form-label">Şifre Tekrar</label>
+                            <input type="password" class="form-control" id="regPassword2" name="password2" required>
+                        </div>
+                        <div id="registerAlerts" class="mb-3"></div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary" id="registerButton">Kayıt Ol</button>
+                        </div>
+                    </form>
+                    <div class="text-center mt-3">
+                        <p class="small">Zaten bir hesabınız var mı? <a href="{% url 'app:frontend_login' %}">Giriş Yapın</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts_extra %}
+
+<script src="{% static 'aircraft_production_app/script/auth_register.js' %}"></script> {# Yeni JS dosyası #}
+{% endblock %}

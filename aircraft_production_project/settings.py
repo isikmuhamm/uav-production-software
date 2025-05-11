@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken', # Token bazlı kimlik doğrulama için
     'django_filters',
+    'drf_spectacular', 
     # Kendi uygulamalarımız
     'aircraft_production_app',
 ]
@@ -140,7 +141,28 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated', # Varsayılan olarak tüm endpoint'ler kimlik doğrulaması istesin
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20,
-    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
+    'DEFAULT_PAGINATION_CLASS': 'aircraft_production_app.pagination.StandardDataTablePagination',
+    'PAGE_SIZE': 10,
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.OrderingFilter',
+        'rest_framework.filters.SearchFilter',
+    ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Hava Aracı Üretim API',
+    'DESCRIPTION': 'Hava aracı üretim ve takip sistemi için geliştirilmiş API dokümantasyonu.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,  # True yaparsanız /api/schema/ altında schema.yaml da sunulur
+    # 'SWAGGER_UI_DIST': 'SIDECAR',  # Swagger UI dosyalarını projenizle birlikte sunmak için (CDN yerine)
+    # 'SWAGGER_UI_SETTINGS': {
+    #     'deepLinking': True,
+    #     'persistAuthorization': True,
+    #     'displayOperationId': True,
+    # },
+    'COMPONENT_SPLIT_REQUEST': True, # Request body'lerini component olarak ayırır, daha okunabilir
+    'COMPONENT_SPLIT_PATCH': True,   # Patch request body'lerini de ayırır
 }

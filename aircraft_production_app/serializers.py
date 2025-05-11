@@ -50,16 +50,23 @@ class PersonnelSerializer(serializers.ModelSerializer):
     """
     Personel modeli için serializer.
     """
-    user = UserSerializer(read_only=True)
+    # user alanı, Personnel modelinde User'a OneToOneField ve primary_key=True olduğu için
+    # bu alan zaten User'ın ID'sini temsil eder ve PersonnelViewSet'te lookup_field olarak kullanılabilir.
+    # Okuma sırasında User bilgilerini göstermek için aşağıdaki alanları ekliyoruz.
+    user_username = serializers.CharField(source='user.username', read_only=True)
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+
     team_name = serializers.CharField(source='team.name', read_only=True, allow_null=True)
-    team_id = serializers.IntegerField(source='team.id', read_only=True, allow_null=True) # Takım ID'si de faydalı olabilir
     team_type = serializers.CharField(source='team.team_type', read_only=True, allow_null=True) # Enum key (örn: ASSEMBLY_TEAM)
     team_type_display = serializers.CharField(source='team.get_team_type_display', read_only=True, allow_null=True) # Okunabilir etiket
 
+    # Takım atama/güncelleme için sadece ID'yi alacağız.
+    team = serializers.PrimaryKeyRelatedField(queryset=Team.objects.all(), allow_null=True, required=False)
+
     class Meta:
         model = Personnel
-        # user alanı OneToOne ve PK olduğu için user_id olarak da geçer
-        fields = ['user', 'team_id', 'team_name', 'team_type', 'team_type_display']
+        fields = ['user', 'user_username', 'user_email', 'team', 'team_name', 'team_type', 'team_type_display']
+        read_only_fields = ['user', 'user_username', 'user_email', 'team_name', 'team_type', 'team_type_display']
 
 
 class TeamSerializer(serializers.ModelSerializer):

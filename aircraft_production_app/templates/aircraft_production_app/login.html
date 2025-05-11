@@ -23,11 +23,14 @@
 {% endblock %}
 
 {% block body_content %}
+<div class="container mt-5">
+<div class="row justify-content-center">
+<div class="col-md-6 col-lg-5">
 <div class="login-container-wrapper">
     <div class="login-card">
         <div class="text-center mb-3">
             <i class="fas fa-plane-departure fa-3x text-primary"></i>
-            <h4 class="mt-2">Üretim Takip Sistemi</h4>
+            <h3 class="mt-2">Üretim Takip Sistemi</h4>
         </div>
         <form id="loginForm" method="POST"> {% csrf_token %}
             <div class="mb-3">
@@ -43,7 +46,13 @@
                 Giriş Yap
             </button>
         </form>
+        <div class="text-center mt-3">
+            <p class="small">Hesabınız yok mu? <a href="{% url 'app:frontend_register' %}">Kayıt Olun</a></p>
+        </div>
     </div>
+</div>
+</div>
+</div>
 </div>
 {% endblock %}
 

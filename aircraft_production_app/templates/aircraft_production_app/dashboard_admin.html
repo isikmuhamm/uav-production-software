@@ -5,7 +5,9 @@
 
     {% block head_extra %}
     <style>
-        /* ... (mevcut dashboard stilleriniz) ... */
+        .status-filter-container {
+            margin-bottom: 15px;
+        }
         .aircraft-model-selector-grid .aircraft-model-card {
             border: 2px solid transparent;
             transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
@@ -38,6 +40,14 @@
             width: 0;
             height: 0;
         }
+        .filter-controls { margin-bottom: 15px; }
+        .filter-controls .form-select, .filter-controls .form-control {
+            display: inline-block;
+            width: auto;
+            min-width: 150px;
+            margin-right: 10px;
+            margin-bottom: 5px;
+        }
     </style>
     {% endblock %}
 
@@ -54,10 +64,10 @@
                 <li class="nav-item user-role-menu user-role-admin user-role-staff" style="display:none;">
                     <a class="nav-link page-link" href="#" data-target="workOrdersContent"><i class="fas fa-clipboard-list"></i> İş Emirleri</a>
                 </li>
-                <li class="nav-item user-role-menu user-role-admin user-role-staff" style="display:none;">
+                <li class="nav-item user-role-menu user-role-admin user-role-staff user-role-assembler" style="display:none;">
                     <a class="nav-link page-link" href="#" data-target="aircraftsContent"><i class="fas fa-fighter-jet"></i> Uçaklar</a>
                 </li>
-                <li class="nav-item user-role-menu user-role-admin user-role-staff" style="display:none;">
+                <li class="nav-item user-role-menu user-role-admin user-role-staff user-role-assembler" style="display:none;">
                     <a class="nav-link page-link" href="#" data-target="partsContent"><i class="fas fa-cogs"></i> Parçalar</a>
                 </li>
                 <li class="nav-item user-role-menu user-role-assembler" style="display:none;">
@@ -74,6 +84,12 @@
                 </li>
                 <li class="nav-item">
                     <a class="nav-link page-link" href="#" data-target="stockLevelsContent"><i class="fas fa-boxes-stacked"></i> Stok Seviyeleri</a>
+                </li>
+                <li class="nav-item user-role-menu user-role-admin user-role-staff" style="display:none;">
+                    <a class="nav-link page-link" href="#" data-target="personnelContent"><i class="fas fa-users-cog"></i> Personel Yönetimi</a>
+                </li>
+                <li class="nav-item user-role-menu user-role-admin user-role-staff" style="display:none;">
+                    <a class="nav-link page-link" href="#" data-target="teamsContent"><i class="fas fa-users"></i> Takım Yönetimi</a>
                 </li>
             </ul>
             <div class="mt-auto p-3 text-center">
@@ -99,21 +115,56 @@
                     <h4>Ana Panel</h4>
                     <p>Sisteme hoş geldiniz. Soldaki menüden işlem seçebilirsiniz.</p>
                     <div id="adminSummary" class="user-role-content user-role-admin user-role-staff" style="display:none;">
-                        <h5>Admin Özeti</h5>
+                        <h5 class="mt-4">Admin Özeti</h5>
+                        <div class="stock-warnings-container mt-3">
+                            <h6 class="mb-2"><i class="fas fa-exclamation-triangle text-danger"></i> Kritik Stok Uyarıları:</h6>
+                            <div id="adminStockWarningsList" class="small">
+                                <!-- Uyarılar JS ile buraya eklenecek -->
+                            </div>
                         </div>
+                    </div>
                     <div id="assemblerSummary" class="user-role-content user-role-assembler" style="display:none;">
-                        <h5>Montajcı Özeti</h5>
+                        <h5 class="mt-4">Montajcı Özeti</h5>
+                        <div class="stock-warnings-container mt-3">
+                            <h6 class="mb-2"><i class="fas fa-exclamation-triangle text-danger"></i> Kritik Stok Uyarıları:</h6>
+                            <div id="assemblerStockWarningsList" class="small">
+                                <!-- Uyarılar JS ile buraya eklenecek -->
+                            </div>
+                        </div>
                     </div>
                      <div id="producerSummary" class="user-role-content user-role-producer" style="display:none;">
-                        <h5>Üretimci Özeti</h5>
+                        <h5 class="mt-4">Üretimci Özeti</h5>
+                        <div class="stock-warnings-container mt-3">
+                            <h6 class="mb-2"><i class="fas fa-exclamation-triangle text-danger"></i> Kritik Stok Uyarıları:</h6>
+                            <div id="producerStockWarningsList" class="small">
+                                <!-- Uyarılar JS ile buraya eklenecek -->
+                            </div>
+                        </div>
+                    </div>
+                    <div id="generalDashboardMessages" class="mt-3">
+                        <!-- Genel mesajlar veya uyarılar buraya eklenebilir -->
                     </div>
                 </div>
 
                 <div id="workOrdersContent" class="page-content user-role-content user-role-admin user-role-staff" style="display:none;">
                     <h4>İş Emirleri Yönetimi</h4>
-                    <button class="btn btn-success mb-3" data-bs-toggle="modal" data-bs-target="#newWorkOrderModal">
+                    <button class="btn btn-success mb-3 user-role-admin user-role-staff" style="display:none;" data-bs-toggle="modal" data-bs-target="#newWorkOrderModal">
                         <i class="fas fa-plus"></i> Yeni İş Emri Oluştur
                     </button>
+                    <div class="row status-filter-container">
+                        <div class="col-md-4">
+                            <label for="workOrderStatusFilter" class="form-label">Duruma Göre Filtrele:</label>
+                            <select id="workOrderStatusFilter" class="form-select form-select-sm">
+                                <option value="">Tüm Durumlar</option>
+                                <option value="PENDING">Beklemede</option>
+                                <option value="ASSIGNED">Atandı</option>
+                                <option value="IN_PROGRESS">Üretimde</option>
+                                <option value="COMPLETED">Tamamlandı</option>
+                                <option value="CANCELLED">İptal Edildi</option>
+                                <option value="PENDING,ASSIGNED,IN_PROGRESS">Aktif İş Emirleri (Bekleyen, Atanmış, Üretimde)</option>
+                            </select>
+                        </div>
+                    </div>
                     <div id="workOrderAlerts"></div>
                     <div class="table-responsive">
                         <table id ="workOrdersTable" class="table table-striped table-hover table-sm">
@@ -140,21 +191,132 @@
                     <div id="stockWarnings" class="alert alert-warning" role="alert" style="display:none;">
                         <strong>Uyarı!</strong> Stoğu kritik seviyede olan veya bitmiş parçalar var.
                     </div>
-                    <div id="stockDataContainer">
+                    <div id="stockDataContainer"> 
+                        <h5 class="mt-3">Parça Stokları</h5>
+                        <div id="partStockAlerts"></div>
+                        <div class="table-responsive">
+                            <table id="partStockTable" class="table table-sm table-striped table-hover" style="width:100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Uçak Modeli</th>
+                                        <th>Parça Tipi</th>
+                                        <th>Mevcut</th>
+                                        <th>Kullanıldı</th>
+                                        <th>Geri Dön.</th>
+                                        <th>Uyarı</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
                         </div>
-                </div>
 
-                <div id="aircraftsContent" class="page-content user-role-content user-role-admin user-role-staff" style="display:none;">
-                    <h4>Uçak İzleme</h4>
-                    <div id="aircraftListContainer"></div>
+                        <div id="aircraftStockContainer" class="user-role-admin user-role-staff user-role-assembler" style="display:none;">
+                            <h5 class="mt-4">Uçak Stokları</h5>
+                            <div id="aircraftStockAlerts"></div>
+                            <div class="table-responsive">
+                                <table id="aircraftStockTable" class="table table-sm table-striped table-hover" style="width:100%;">
+                                    <thead></thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div id="partsContent" class="page-content user-role-content user-role-admin user-role-staff" style="display:none;">
-                    <h4>Parça İzleme</h4>
-                     <div id="partListContainer"></div>
+                <div id="aircraftsContent" class="page-content user-role-content user-role-admin user-role-staff user-role-assembler" style="display:none;">
+                    <h4>Uçak İzleme</h4>
+                    <div class="filter-controls">
+                        <select id="aircraftStatusFilter" class="form-select form-select-sm">
+                            <option value="">Tüm Durumlar</option>
+                            <option value="ACTIVE">Aktif</option>
+                            <option value="READY_FOR_DELIVERY">Teslimata Hazır</option>
+                            <option value="DELIVERED">Teslim Edildi</option>
+                            <option value="DECOMMISSIONED">Hizmet Dışı</option>
+                            <option value="RECYCLED">Geri Dönüştürülmüş</option>
+                        </select>
+                        <select id="aircraftModelFilter" class="form-select form-select-sm">
+                            <option value="">Tüm Uçak Modelleri</option>
+                        </select>
+                        <select id="aircraftTeamFilter" class="form-select form-select-sm user-role-admin user-role-staff" style="display:none;">
+                            <option value="">Tüm Montaj Takımları</option>
+                        </select>
+                    </div>
+                    <div id="aircraftsAlerts"></div>
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover table-sm" id="aircraftsTable" style="width:100%;">
+                            <thead></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="partsContent" class="page-content user-role-content user-role-admin user-role-staff user-role-assembler" style="display:none;">
+                    <h4>Parça Yönetimi (Tüm Parçalar)</h4>
+                    <div class="filter-controls">
+                        <select id="adminPartStatusFilter" class="form-select form-select-sm">
+                            <option value="">Tüm Durumlar</option>
+                            <option value="AVAILABLE">Mevcut</option>
+                            <option value="USED">Kullanımda</option>
+                            <option value="IN_PRODUCTION">Üretimde</option>
+                            <option value="DEFECTIVE">Kusurlu</option>
+                            <option value="RECYCLED">Geri Dönüştürülmüş</option>
+                        </select>
+                        <select id="adminPartCategoryFilter" class="form-select form-select-sm">
+                            <option value="">Tüm Kategoriler</option>
+                            </select>
+                        <select id="adminPartAircraftModelFilter" class="form-select form-select-sm">
+                            <option value="">Tüm Uçak Modelleri</option>
+                            </select>
+                        </div>
+                    <div id="adminPartsAlerts"></div>
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover table-sm" id="adminPartsTable" style="width:100%;">
+                            <thead></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="myTeamPartsContent" class="page-content user-role-content user-role-producer" style="display:none;">
+                    <h4>Takımımın Ürettiği Parçalar</h4>
+                    <div class="filter-controls">
+                        <select id="producerPartStatusFilter" class="form-select form-select-sm">
+                            <option value="">Tüm Durumlar</option>
+                            <option value="AVAILABLE">Mevcut</option>
+                            <option value="IN_PRODUCTION">Üretimde</option>
+                            <option value="USED">Kullanımda</option>
+                            <option value="DEFECTIVE">Kusurlu</option>
+                            <option value="RECYCLED">Geri Dönüştürülmüş</option>
+                        </select>
+                        <select id="producerPartAircraftModelFilter" class="form-select form-select-sm">
+                            <option value="">Tüm Uçak Modelleri</option>
+                            </select>
+                    </div>
+                    <div id="myTeamPartsAlerts"></div>
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover table-sm" id="myTeamPartsTable" style="width:100%;">
+                            <thead></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
                 </div>
                  <div id="assignedWorkOrdersContent" class="page-content user-role-content user-role-assembler" style="display:none;">
                     <h4>Atanmış İş Emirlerim</h4>
-                    <div id="assignedWorkOrderListContainer"></div>
+                    <div id="assignedWorkOrderAlerts"></div>
+                    <div class="table-responsive">
+                        <table id="assignedWorkOrdersTable" class="table table-striped table-hover table-sm" style="width:100%;">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Uçak Modeli</th>
+                                    <th>Miktar</th>
+                                    <th>Durum</th>
+                                    <th>Atanan Takım</th>
+                                    <th>Oluşturma Tarihi</th>
+                                    <th>Hedef Tarih</th>
+                                    <!-- Montajcı için İşlemler sütunu şimdilik boş veya farklı olabilir -->
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
                 </div>
                 <div id="assembleAircraftContent" class="page-content user-role-content user-role-assembler" style="display:none;">
                     <h4>Uçak Montaj</h4>
@@ -192,6 +354,50 @@
                 <div id="myTeamPartsContent" class="page-content user-role-content user-role-producer" style="display:none;">
                     <h4>Takımımın Ürettiği Parçalar</h4>
                     <div id="myTeamPartsListContainer"></div>
+                </div>
+
+                <div id="personnelContent" class="page-content user-role-content user-role-admin user-role-staff" style="display:none;">
+                    <h4>Personel Yönetimi</h4>
+                    <!-- <button class="btn btn-success mb-3" id="btnOpenNewPersonnelModal">
+                        <i class="fas fa-user-plus"></i> Yeni Personel Ekle
+                    </button> -->
+                    <div id="personnelAlerts"></div>
+                    <div class="table-responsive">
+                        <table id="personnelTable" class="table table-striped table-hover table-sm" style="width:100%;">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Kullanıcı Adı</th>
+                                    <th>E-posta</th>
+                                    <th>Takımı</th>
+                                    <th>İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="teamsContent" class="page-content user-role-content user-role-admin user-role-staff" style="display:none;">
+                    <h4>Takım Yönetimi</h4>
+                    <button class="btn btn-success mb-3" id="btnOpenNewTeamModal">
+                        <i class="fas fa-users-plus"></i> Yeni Takım Ekle
+                    </button>
+                    <div id="teamAlerts"></div>
+                    <div class="table-responsive">
+                        <table id="teamsTable" class="table table-striped table-hover table-sm" style="width:100%;">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Takım Adı</th>
+                                    <th>Takım Tipi</th>
+                                    <th>Personel Sayısı</th>
+                                    <th>İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
                 </div>
 
             </main>
@@ -235,6 +441,77 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
                     <button type="button" class="btn btn-primary" id="saveWorkOrderBtn">İş Emrini Kaydet</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Personel Ekle/Düzenle Modal -->
+    <div class="modal fade" id="personnelModal" tabindex="-1" aria-labelledby="personnelModalLabel">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="personnelModalLabel">Personel Ekle/Düzenle</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="personnelForm">
+                        <input type="hidden" id="personnelId">
+                        <div class="mb-3">
+                            <label for="personnelUsername" class="form-label">Kullanıcı Adı</label>
+                            <input type="text" class="form-control" id="personnelUsername" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="personnelEmail" class="form-label">E-posta</label>
+                            <input type="email" class="form-control" id="personnelEmail" required>
+                        </div>
+                        <div class="mb-3" id="personnelPasswordGroup">
+                            <label for="personnelPassword" class="form-label">Şifre (Yeni personel için)</label>
+                            <input type="password" class="form-control" id="personnelPassword">
+                        </div>
+                        <div class="mb-3">
+                            <label for="personnelTeam" class="form-label">Takım</label>
+                            <select class="form-select" id="personnelTeam"></select>
+                        </div>
+                        <div id="personnelFormError" class="text-danger"></div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+                    <button type="button" class="btn btn-primary" id="savePersonnelBtn">Kaydet</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Takım Ekle/Düzenle Modal (Basit hali) -->
+    <div class="modal fade" id="teamModal" tabindex="-1" aria-labelledby="teamModalLabel">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="teamModalLabel">Takım Ekle/Düzenle</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="teamForm">
+                        <input type="hidden" id="teamId">
+                        <div class="mb-3">
+                            <label for="teamNameInput" class="form-label">Takım Adı</label>
+                            <input type="text" class="form-control" id="teamNameInput" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="teamTypeSelect" class="form-label">Takım Tipi</label>
+                            <select class="form-select" id="teamTypeSelect" required>
+                                <option value="">Tip Seçiniz...</option>
+                                <!-- Takım tipleri JS ile buraya eklenecek -->
+                            </select>
+                        </div>
+                        <div id="teamFormError" class="text-danger"></div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+                    <button type="button" class="btn btn-primary" id="saveTeamBtn">Kaydet</button>
                 </div>
             </div>
         </div>
