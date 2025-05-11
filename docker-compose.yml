@@ -1,0 +1,45 @@
+# d:\WebProjects\uav-production-software\docker-compose.yml
+
+services:
+  db:
+    image: postgres:15 # PostgreSQL 15 imajını kullan
+    container_name: hava_araci_uretim_db_container
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/ # Verilerin kalıcı olması için volume
+    environment:
+      POSTGRES_DB: ${DB_NAME:-hava_araci_uretim_db}
+      POSTGRES_USER: ${DB_USER:-django_project_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-GucluS1fre!} # README'deki örnek şifre
+    ports:
+      - "5433:5432" # Host'ta 5433 portunu konteynerdeki 5432'ye yönlendir (isteğe bağlı, debug için)
+
+  web:
+    build: . # Proje dizinindeki Dockerfile'ı kullanarak imaj oluştur
+    container_name: hava_araci_uretim_web_container
+    command: /app/entrypoint.sh # Konteyner başladığında bu script çalışacak
+    volumes:
+      - .:/app # Kod değişikliklerinin anında yansıması için proje dizinini bağla
+    ports:
+      - "8000:8000" # Host'ta 8000 portunu konteynerdeki 8000'e yönlendir
+    environment:
+      # Django ayarları için ortam değişkenleri
+      # Bu değerler Django settings.py dosyan tarafından okunmalı
+      # (python-dotenv kütüphanesi ile .env dosyasından veya doğrudan os.environ'dan)
+      SECRET_KEY: ${SECRET_KEY:-'django_secret_keyinizi_buraya_koyun_cok_guvenli_bir_sey_olsun!'} # Güvenli bir anahtar kullanın!
+      DEBUG: ${DEBUG:-True}
+      
+      # Veritabanı bağlantı bilgileri (PostgreSQL servisine bağlanmak için)
+      DB_ENGINE: django.db.backends.postgresql
+      DB_NAME: ${DB_NAME:-hava_araci_uretim_db}
+      DB_USER: ${DB_USER:-django_project_user}
+      DB_PASSWORD: ${DB_PASSWORD:-GucluS1fre!}
+      DB_HOST: db # Docker Compose network'ündeki PostgreSQL servisinin adı
+      DB_PORT: 5432
+      
+      # PGPASSWORD'ü entrypoint.sh'in de kullanabilmesi için burada da tanımlıyoruz
+      PGPASSWORD: ${DB_PASSWORD:-GucluS1fre!}
+    depends_on:
+      - db # 'web' servisi başlamadan önce 'db' servisinin başlamasını bekle
+
+volumes:
+  postgres_data: # PostgreSQL verilerinin saklanacağı volume

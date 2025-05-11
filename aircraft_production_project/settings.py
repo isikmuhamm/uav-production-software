@@ -16,7 +16,7 @@ from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent # Projenin kök dizini
-
+env_path = os.path.join(os.path.dirname(BASE_DIR), '.env')
 load_dotenv() # .env dosyasını yüklemek için bu satırı ekleyin
 
 SECRET_KEY = os.getenv('SECRET_KEY')
@@ -83,7 +83,7 @@ WSGI_APPLICATION = 'aircraft_production_project.wsgi.application' # WSGI sunucul
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
+        'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.postgresql'),
         'NAME': os.getenv('DB_NAME'),
         'USER': os.getenv('DB_USER'),
         'PASSWORD': os.getenv('DB_PASSWORD'),
