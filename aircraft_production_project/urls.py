@@ -17,16 +17,12 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.authtoken import views as authtoken_views
-from aircraft_production_app import views as app_views # current_user_info için
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    
-    # Token Authentication Endpoint'i
-    path('api/auth/login/', authtoken_views.obtain_auth_token, name='api_token_auth'),
-    # current_user_info view'ını aircraft_production_app.views içine taşıdık/oluşturduk
-    path('api/user/me/', app_views.current_user_info, name='current_user_info'), 
-    
-    # aircraft_production_app için API URL'lerini dahil et
-    path('api/', include('aircraft_production_app.urls')), # Uygulama URL'lerini 'api/' altında topluyoruz
+    path('api-token-auth/', authtoken_views.obtain_auth_token, name='api_token_auth'), # Adını değiştirdim
+    # Uygulama URL'lerini doğrudan include edelim
+    path('', include('aircraft_production_app.urls')),
 ]
+

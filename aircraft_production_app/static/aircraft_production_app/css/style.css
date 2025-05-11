@@ -1,0 +1,59 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f4f7f6;
+}
+.login-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.login-card {
+    width: 100%;
+    max-width: 400px;
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    background-color: #fff;
+}
+.sidebar {
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 260px;
+    background-color: #343a40;
+    padding-top: 1rem;
+    transition: all 0.3s;
+}
+.sidebar a {
+    padding: 10px 15px;
+    text-decoration: none;
+    font-size: 1.1rem;
+    color: #adb5bd;
+    display: block;
+    transition: all 0.2s;
+}
+.sidebar a:hover, .sidebar a.active {
+    color: #fff;
+    background-color: #495057;
+}
+.sidebar .nav-link i {
+    margin-right: 10px;
+}
+.content {
+    margin-left: 260px;
+    padding: 20px;
+    transition: all 0.3s;
+}
+.navbar-custom {
+    margin-left: 260px;
+    background-color: #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.error-message {
+    color: red;
+    font-size: 0.9em;
+}
+/* Sayfa yüklendiğinde login ekranını, başarılı giriş sonrası dashboard'u göster */
+#dashboardScreen { display: none; }

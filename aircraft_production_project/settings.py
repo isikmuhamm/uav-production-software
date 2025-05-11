@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     # Üçüncü parti uygulamalar
     'rest_framework',
     'rest_framework.authtoken', # Token bazlı kimlik doğrulama için
+    'django_filters',
     # Kendi uygulamalarımız
     'aircraft_production_app',
 ]
@@ -61,10 +62,10 @@ ROOT_URLCONF = 'aircraft_production_project.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
@@ -135,11 +136,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication', # Token tabanlı kimlik doğrulamayı varsayılan yap
-        # 'rest_framework.authentication.SessionAuthentication', # Eğer DRF'in browsable API'ını kullanırken Django session'ı ile de test yapmak isterseniz
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated', # Varsayılan olarak tüm endpoint'ler kimlik doğrulaması istesin
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
 }

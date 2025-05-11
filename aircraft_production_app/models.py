@@ -5,6 +5,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction # Atomik işlemler için
 from django.db.models import Max # Max'ı import ettiğinizden emin olun
+from django.templatetags.static import static
 
 
 # === SABİT TANIMLI BİLGİLER ===
@@ -139,11 +140,37 @@ class AircraftModel(models.Model):
         max_length=50,
         choices=AircraftModelChoices.choices, # Sabit seçenekler
         unique=True,
-        verbose_name="Hava Aracı Modeli"
+        verbose_name="Hava Aracı Modeli Adı"
     )
 
     def __str__(self):
-        return self.get_name_display() # choices kullandığımız için get_X_display() daha iyi
+        return self.get_name_display()
+
+    @property
+    def image_filename(self):
+        """
+        Modele ait resim dosyasının adını döndürür.
+        Resimlerin aircraft_production_app/static/aircraft_production_app/images/
+        klasöründe modelin 'name' alanı (enum value, örn: "TB2") ile aynı isimde
+        ve .png uzantılı olduğunu varsayar. (örn: tb2.png, akinci.png)
+        """
+        if self.name:
+            return f"{self.name.lower()}.png"
+        return None
+
+    @property
+    def image_url(self):
+        """
+        Modele ait resmin tam statik URL'sini döndürür.
+        """
+        filename = self.image_filename
+        if filename:
+            # static() fonksiyonu 'app_name:path/to/file' formatını beklemez,
+            # doğrudan 'path/to/file' şeklinde alır ve STATICFILES_DIRS veya
+            # uygulama static klasörlerinden bulur.
+            # Klasör yapımız: aircraft_production_app/static/aircraft_production_app/images/
+            return static(f'aircraft_production_app/images/{filename}')
+        return static('aircraft_production_app/images/placeholder.png') # Varsayılan bir resim
 
     class Meta:
         verbose_name = "Hava Aracı Modeli"

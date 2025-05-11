@@ -1,0 +1,52 @@
+{% extends "aircraft_production_app/base.html" %}
+{% load static %}
+
+{% block title %}Sistem Girişi - {{ block.super }}{% endblock %}
+
+{% block head_extra %}
+<style>
+    .login-container-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-grow: 1;
+    }
+    .login-card {
+        width: 100%;
+        max-width: 400px;
+        padding: 25px;
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        background-color: #fff;
+    }
+</style>
+{% endblock %}
+
+{% block body_content %}
+<div class="login-container-wrapper">
+    <div class="login-card">
+        <div class="text-center mb-3">
+            <i class="fas fa-plane-departure fa-3x text-primary"></i>
+            <h4 class="mt-2">Üretim Takip Sistemi</h4>
+        </div>
+        <form id="loginForm" method="POST"> {% csrf_token %}
+            <div class="mb-3">
+                <label for="username" class="form-label">Kullanıcı Adı</label>
+                <input type="text" class="form-control" id="username" name="username" required>
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">Şifre</label>
+                <input type="password" class="form-control" id="password" name="password" required>
+            </div>
+            <div id="loginError" class="error-message mb-3"></div>
+            <button type="submit" class="btn btn-primary w-100" id="loginButton">
+                Giriş Yap
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts_extra %}
+{# Login'e özel JavaScript main.js'e taşındı #}
+{% endblock %}

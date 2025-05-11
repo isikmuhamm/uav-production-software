@@ -1,7 +1,8 @@
 from rest_framework.decorators import api_view, permission_classes, authentication_classes, action
 from rest_framework.response import Response
 from rest_framework.views import APIView # APIView'ı import et
-from rest_framework import viewsets, permissions, status as drf_status, serializers # permissions'ı import et
+from rest_framework import viewsets, filters, permissions, status as drf_status, serializers # permissions'ı import et
+from django_filters.rest_framework import DjangoFilterBackend # Bunu da import edin
 
 from django.shortcuts import render
 from django.shortcuts import get_object_or_404
@@ -11,6 +12,15 @@ from django.db import transaction, models # transaction ve models'ı import et
 from .models import Part, PartType, AircraftModel, Aircraft, Team, Personnel, PartCategory, DefinedTeamTypes, PartStatusChoices, AircraftStatusChoices, WorkOrder, WorkOrderStatusChoices # Modelleri import et
 from .serializers import AircraftModelSerializer, AircraftSerializer, AircraftAssemblySerializer, PartTypeSerializer, TeamSerializer, PersonnelSerializer, PartSerializer, WorkOrderSerializer, serializers # Serializer'ları import et
 from .permissions import IsAdminOrReadOnly, IsOwnerTeamOrAdminForPart,  IsAssemblyTeamMemberOrAdminForAircraft, CanAssembleAircraft, IsNotAssemblyTeamForCreate
+from .filters import WorkOrderFilter
+
+
+def frontend_login_view(request):
+    """Personel giriş sayfasını sunar."""
+    return render(request, 'aircraft_production_app/login.html')
+
+def frontend_dashboard_view(request): # Tek bir dashboard view'ı, JS rolü yönetecek
+    return render(request, 'aircraft_production_app/dashboard_admin.html') # Hepsi aynı ana şablonu kullanacak
 
 
 # Oturum açmış kullanıcı bilgilerini döndürür
@@ -65,6 +75,22 @@ class TeamViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = TeamSerializer
     permission_classes = [permissions.IsAuthenticated, IsAdminOrReadOnly] # Daha sonra IsAdminUser yapılabilir
 
+    def get_queryset(self):
+        """
+        İsteğe bağlı olarak 'team_type' query parametresine göre takımları filtreler.
+        """
+        queryset = Team.objects.all().prefetch_related('members') # Temel queryset
+        
+        team_type_filter = self.request.query_params.get('team_type')
+        if team_type_filter:
+            # Gelen team_type_filter değerinin DefinedTeamTypes içinde geçerli bir key olup olmadığını kontrol edebiliriz.
+            # Örneğin: if team_type_filter in DefinedTeamTypes.values:
+            # Şimdilik doğrudan filtrelemeye çalışıyoruz.
+            # DefinedTeamTypes.ASSEMBLY_TEAM gibi bir enum key'i bekleniyor.
+            queryset = queryset.filter(team_type=team_type_filter)
+            
+        return queryset
+
 class PersonnelViewSet(viewsets.ModelViewSet):
     """
     Personelleri listeler ve detaylarını görüntüler.
@@ -99,21 +125,34 @@ class PartViewSet(viewsets.ModelViewSet):
         Admin/Süper kullanıcı tüm parçaları görebilir.
         """
         user = self.request.user
-        base_queryset = Part.objects.all().select_related(
+        queryset = Part.objects.all().select_related(
             'part_type', 'aircraft_model_compatibility', 
             'produced_by_team', 'created_by_personnel__user'
         )
+
+        # Durum filtresi (query parameter: ?status=AVAILABLE veya ?status=USED,RECYCLED)
+        status_filter_param = self.request.query_params.get('status')
+        if status_filter_param:
+            statuses_to_filter = [status.strip().upper() for status in status_filter_param.split(',')]
+            valid_statuses = [s_val for s_val, s_label in PartStatusChoices.choices if s_val in statuses_to_filter]
+            if valid_statuses:
+                queryset = queryset.filter(status__in=valid_statuses)
+
         if user.is_superuser or user.is_staff:
-            return base_queryset
+            return queryset.order_by('-production_date')
         
         try:
             personnel = user.personnel
             if personnel.team:
-                # Üretimci kendi takımının parçalarını, Montajcı tüm 'AVAILABLE' parçaları görebilir
-                if personnel.team.can_perform_assembly():
-                    return base_queryset.filter(status=PartStatusChoices.AVAILABLE) # Montajcı sadece mevcut parçaları görsün
-                else: # Üretim takımı ise sadece kendi ürettiklerini
-                    return base_queryset.filter(produced_by_team=personnel.team)
+                if personnel.team.can_perform_assembly(): # Montajcı
+                    # Montajcı varsayılan olarak 'AVAILABLE' parçaları görsün (montaj için)
+                    # Ama filtreyle diğerlerini de görebilmeli
+                    if not status_filter_param: # Eğer özel bir status filtresi yoksa
+                        return queryset.filter(status=PartStatusChoices.AVAILABLE).order_by('-production_date')
+                    else: # Status filtresi varsa, tüm parçalar arasından o statüdekileri görsün
+                        return queryset.order_by('-production_date') 
+                else: # Üretim takımı ise sadece kendi ürettiklerini (tüm durumlar filtrelenebilir)
+                    return queryset.filter(produced_by_team=personnel.team).order_by('-production_date')
         except Personnel.DoesNotExist:
             return Part.objects.none() # Personel kaydı yoksa hiçbir şey göremez
         return Part.objects.none() # Takımı olmayan personel hiçbir şey göremez
@@ -267,21 +306,32 @@ class AircraftViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        base_queryset = Aircraft.objects.all().select_related(
+        queryset = Aircraft.objects.all().select_related(
             'aircraft_model', 'assembled_by_team', 
             'assembled_by_personnel__user', 'work_order',
             'wing', 'fuselage', 'tail', 'avionics' 
         )
+        
+        # Durum filtresi (query parameter: ?status=ACTIVE veya ?status=RECYCLED)
+        status_filter_param = self.request.query_params.get('status')
+        if status_filter_param:
+            statuses_to_filter = [status.strip().upper() for status in status_filter_param.split(',')]
+            valid_statuses = [s_val for s_val, s_label in AircraftStatusChoices.choices if s_val in statuses_to_filter]
+            if valid_statuses:
+                queryset = queryset.filter(status__in=valid_statuses)
+
         if user.is_superuser or user.is_staff:
-            return base_queryset
+            return queryset.order_by('-assembly_date')
+        
         try:
             personnel = user.personnel
             if personnel.team and personnel.team.can_perform_assembly():
-                # Montajcı sadece kendi takımının monte ettiği uçakları görsün
-                return base_queryset.filter(assembled_by_team=personnel.team)
+                # Montajcı kendi takımının monte ettiği TÜM DURUMDAKİ uçakları görsün
+                return queryset.filter(assembled_by_team=personnel.team).order_by('-assembly_date')
         except Personnel.DoesNotExist:
             return Aircraft.objects.none()
-        return Aircraft.objects.none()
+        
+        return Aircraft.objects.none() # Diğer roller (örn: üretimci) uçak listesi görmez
     
     def perform_destroy(self, instance):
         """
@@ -297,6 +347,30 @@ class AircraftViewSet(viewsets.ModelViewSet):
 class WorkOrderViewSet(viewsets.ModelViewSet): # CRUD işlemleri için ModelViewSet
     serializer_class = WorkOrderSerializer
 
+    filter_backends = [
+        DjangoFilterBackend,      # django-filter ile özel filtreleme için
+        filters.OrderingFilter,   # ?ordering=alan_adi ile sıralama için
+        filters.SearchFilter      # ?search=arama_terimi ile genel arama için
+    ]
+    filterset_class = WorkOrderFilter # aircraft_production_app/filters.py içinde tanımlayacağız
+    
+    ordering_fields = [ # API üzerinden hangi alanlara göre sıralama yapılabileceği
+        'id', 
+        'aircraft_model__name', 
+        'quantity', 
+        'status', 
+        'created_at', 
+        'target_completion_date', 
+        'assigned_to_assembly_team__name'
+    ]
+    search_fields = [ # Genel arama (DataTable'ın sağ üstündeki arama kutusu) hangi alanlarda çalışsın?
+        'id', 
+        'aircraft_model__name', 
+        'notes', 
+        'assigned_to_assembly_team__name', 
+        'created_by__username'
+    ]
+
     def get_permissions(self):
         """
         Action'a göre farklı izinler ata.
@@ -311,18 +385,43 @@ class WorkOrderViewSet(viewsets.ModelViewSet): # CRUD işlemleri için ModelView
 
     def get_queryset(self):
         user = self.request.user
-        if user.is_superuser or user.is_staff:
-            return WorkOrder.objects.all().select_related('aircraft_model', 'created_by', 'assigned_to_assembly_team')
+        queryset = WorkOrder.objects.all().select_related(
+            'aircraft_model', 
+            'created_by', 
+            'assigned_to_assembly_team'
+        )
+
+        # Durum filtresi (query parameter: ?status=COMPLETED veya ?status=PENDING,ASSIGNED)
+        status_filter_param = self.request.query_params.get('status')
+        if status_filter_param:
+            statuses_to_filter = [status.strip().upper() for status in status_filter_param.split(',')]
+            # Gelen status değerlerinin WorkOrderStatusChoices içinde geçerli olup olmadığını kontrol et
+            valid_statuses = [s_val for s_val, s_label in WorkOrderStatusChoices.choices if s_val in statuses_to_filter]
+            if valid_statuses:
+                queryset = queryset.filter(status__in=valid_statuses)
+            # else:
+                # Geçersiz status parametresi gönderilirse tümünü döndür veya hata ver. Şimdilik tümünü döndürsün.
+                # pass
+
+        if user.is_superuser or user.is_staff: # Adminler (filtrelenmişse) tümünü görebilir
+            return queryset.order_by('-created_at')
+        
         try:
             personnel = user.personnel
-            if personnel.team and personnel.team.can_perform_assembly():
-                # Montajcılar, kendi takımlarına atanmış VEYA henüz kimseye atanmamış (PENDING) ve durumu uygun olanları görsün
-                return WorkOrder.objects.filter(
-                    models.Q(assigned_to_assembly_team=personnel.team) | models.Q(assigned_to_assembly_team__isnull=True, status=WorkOrderStatusChoices.PENDING)
-                ).exclude(status__in=[WorkOrderStatusChoices.COMPLETED, WorkOrderStatusChoices.CANCELLED]).select_related('aircraft_model', 'created_by', 'assigned_to_assembly_team')
+            if personnel.team and personnel.team.can_perform_assembly(): # Eğer kullanıcı bir Montaj Takımı üyesi ise
+                # Kendi takımına atanmış VEYA henüz kimseye atanmamış (PENDING)
+                # VE durumu "Tamamlandı" veya "İptal Edildi" OLMAYAN iş emirlerini varsayılan olarak görsün.
+                # Eğer status filtresi varsa, o filtre öncelikli olur.
+                visibility_filter = models.Q(assigned_to_assembly_team=personnel.team) | models.Q(assigned_to_assembly_team__isnull=True, status=WorkOrderStatusChoices.PENDING) | models.Q(assigned_to_assembly_team__isnull=True, status=WorkOrderStatusChoices.IN_PROGRESS)
+
+                return queryset.filter(visibility_filter).distinct().order_by('-created_at')
+            else: # Diğer roller (örn: Üretimciler) iş emirlerini bu viewset üzerinden görmez.
+                return queryset.none()
+            
         except Personnel.DoesNotExist:
-            return WorkOrder.objects.none()
-        return WorkOrder.objects.none()
+            return queryset.none() # Personel profili olmayanlar (admin değilse)
+        
+        return queryset.none() # Diğer tüm durumlar için (örn: üretimci)
 
     def perform_create(self, serializer):
         # API üzerinden yeni iş emri oluşturulursa, oluşturan kişiyi otomatik ata

@@ -1,0 +1,128 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Hava Aracı Üretim Sistemi{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="shortcut icon" href="{% static 'favicon.ico' %}" type="image/x-icon">
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .main-content { flex: 1; }
+        .footer { background-color: #343a40; color: white; padding: 1rem 0; text-align: center; font-size: 0.9em; }
+        .error-message { color: #dc3545; font-size: 0.9em; margin-top: 5px; }
+        .success-message { color: #198754; font-size: 0.9em; margin-top: 5px; }
+        .loading-spinner { display: none; position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 1050; }
+        .sidebar { height: 100vh; position: fixed; top: 0; left: 0; width: 260px; background-color: #343a40; padding-top: 1rem; transition: all 0.3s; z-index: 1000; }
+        .sidebar a { padding: 10px 15px; text-decoration: none; font-size: 1.05rem; color: #adb5bd; display: block; transition: all 0.2s; }
+        .sidebar a:hover, .sidebar a.active { color: #fff; background-color: #495057; }
+        .sidebar .nav-link i { margin-right: 10px; width: 20px; text-align: center; }
+        .sidebar .mt-auto { position: absolute; bottom: 0; width: 100%; }
+        .main-wrapper { margin-left: 260px; display: flex; flex-direction: column; min-height: 100vh; }
+        .navbar-custom { background-color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 1020; }
+        .content { padding: 20px; flex-grow: 1; }
+        .page-content { display: none; }
+        .page-content.active { display: block; }
+        .aircraft-model-selector-grid .aircraft-model-card {
+        border: 2px solid transparent;
+        transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        cursor: pointer;
+        }
+        .aircraft-model-selector-grid .aircraft-model-card:hover {
+            border-color: #0d6efd; /* Bootstrap primary color */
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+        }
+        .aircraft-model-selector-grid .aircraft_model_card.selected {
+            border-color: #0a58ca; /* Daha koyu primary */
+            background-color: #e7f1ff;
+        }
+        .aircraft-model-selector-grid .aircraft-model-card img {
+            max-height: 70px; /* Resim yüksekliğini ayarlayın */
+            object-fit: contain; /* Resmin orantısını koru */
+            margin-bottom: 0.5rem;
+        }
+        .aircraft-model-selector-grid .aircraft-model-card .card-title {
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        /* Radyo butonunu tamamen gizle (görsel olarak kart seçiliyor) */
+        .aircraft-model-selector-grid input[type="radio"] {
+            display: none;
+        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; display: flex; flex-direction: column; min-height: 100vh; }
+        .main-content { flex: 1; }
+        .footer { background-color: #343a40; color: white; padding: 1rem 0; text-align: center; font-size: 0.9em; }
+        .error-message { color: #dc3545; font-size: 0.9em; margin-top: 5px; }
+        .success-message { color: #198754; font-size: 0.9em; margin-top: 5px; }
+        .loading-spinner { display: none; position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 1050; }
+        .sidebar { height: 100vh; position: fixed; top: 0; left: 0; width: 260px; background-color: #343a40; padding-top: 1rem; transition: all 0.3s; z-index: 1000; }
+        .sidebar a { padding: 10px 15px; text-decoration: none; font-size: 1.05rem; color: #adb5bd; display: block; transition: all 0.2s; }
+        .sidebar a:hover, .sidebar a.active { color: #fff; background-color: #495057; }
+        .sidebar .nav-link i { margin-right: 10px; width: 20px; text-align: center; }
+        .sidebar .mt-auto { position: absolute; bottom: 0; width: 100%; }
+        .main-wrapper { margin-left: 260px; display: flex; flex-direction: column; min-height: 100vh; }
+        .navbar-custom { background-color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 1020; }
+        .content { padding: 20px; flex-grow: 1; }
+        .page-content { display: none; }
+        .page-content.active { display: block; }
+        /* DataTable için ek stiller */
+        table.dataTable th, table.dataTable td { white-space: nowrap; /* Uzun içeriklerin satır atlamasını engelle */ }
+        .dataTables_wrapper .dataTables_paginate .paginate_button { padding: 0.3em 0.8em; }
+        .dataTables_wrapper .dataTables_filter input { margin-left: 0.5em; display: inline-block; width: auto; }
+
+    </style>
+    {% block head_extra %}{% endblock %}
+</head>
+<body>
+    <div id="loadingSpinner" class="loading-spinner">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Yükleniyor...</span>
+        </div>
+    </div>
+
+    <div class="main-content">
+    {% block body_content %}
+    {% endblock %}
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <span>&copy; {% now "Y" %} Hava Aracı Üretim Sistemi</span>
+        </div>
+    </footer>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+ 
+    
+    <script>
+        const CSRF_TOKEN = "{{ csrf_token }}"; // Django'nun CSRF token'ı (Ajax POST için)
+        const API_LOGIN_URL = "{% url 'api_token_auth' %}"; // Token alma endpoint'i
+        const API_USER_ME_URL = "{% url 'api:current-user-api' %}"; // Kullanıcı bilgisi endpoint'i
+        const API_APP_BASE_URL = "{% url 'api:api-root' %}"; // Uygulama API'lerinin kök yolu (örn: /api/)
+                                                              // Router'ınızın 'api-root' adında bir view'ı olmalı
+                                                              // veya doğrudan "/api/" yazabilirsiniz.
+                                                              // Şimdilik "/api" kullanalım.
+        const LOGIN_PAGE_URL = "{% url 'app:frontend_login' %}";
+        const DASHBOARD_URL = "{% url 'app:frontend_dashboard' %}";
+        const DATATABLES_TR_JSON_URL = "{% static 'aircraft_production_app/script/tr.json' %}"
+    </script>
+    
+    <script src="{% static 'aircraft_production_app/script/main.js' %}"></script>
+    {% block scripts_extra %}{% endblock %}
+</body>
+</html>
+

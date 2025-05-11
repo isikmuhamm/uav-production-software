@@ -16,7 +16,7 @@ class AircraftModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AircraftModel
-        fields = ['id', 'name', 'name_display']
+        fields = ['id', 'name', 'name_display', 'image_filename', 'image_url']
         read_only_fields = fields # Bu serializer sadece okuma amaçlı olacak
 
 class PartTypeSerializer(serializers.ModelSerializer):
@@ -50,15 +50,16 @@ class PersonnelSerializer(serializers.ModelSerializer):
     """
     Personel modeli için serializer.
     """
-    user = UserSerializer(read_only=True) # User bilgilerini iç içe göstermek için
+    user = UserSerializer(read_only=True)
     team_name = serializers.CharField(source='team.name', read_only=True, allow_null=True)
-    team_type_display = serializers.CharField(source='team.get_team_type_display', read_only=True, allow_null=True)
+    team_id = serializers.IntegerField(source='team.id', read_only=True, allow_null=True) # Takım ID'si de faydalı olabilir
+    team_type = serializers.CharField(source='team.team_type', read_only=True, allow_null=True) # Enum key (örn: ASSEMBLY_TEAM)
+    team_type_display = serializers.CharField(source='team.get_team_type_display', read_only=True, allow_null=True) # Okunabilir etiket
 
     class Meta:
         model = Personnel
-        fields = ['user', 'team', 'team_name', 'team_type_display']
-        # 'user' alanı OneToOne ve primary_key olduğu için ID olarak 'user_id' şeklinde de erişilebilir.
-        # POST/PUT isteklerinde 'user' alanı için User ID'si göndermek gerekebilir.
+        # user alanı OneToOne ve PK olduğu için user_id olarak da geçer
+        fields = ['user', 'team_id', 'team_name', 'team_type', 'team_type_display']
 
 
 class TeamSerializer(serializers.ModelSerializer):
@@ -66,7 +67,7 @@ class TeamSerializer(serializers.ModelSerializer):
     Takım modeli için serializer.
     """
     team_type_display = serializers.CharField(source='get_team_type_display', read_only=True)
-    personnel_count = serializers.IntegerField(source='personnel_count', read_only=True) # Modeldeki metodu kullan
+    personnel_count = serializers.IntegerField(read_only=True) # Modeldeki metodu kullan
     # display_personnel_names metodu çok uzun olabileceği için API'de doğrudan kullanmak yerine
     # personellere ayrı bir endpoint üzerinden erişim sağlamak daha iyi olabilir.
 
