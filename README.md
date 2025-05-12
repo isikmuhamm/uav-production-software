@@ -8,7 +8,7 @@ Sistem, farklı kullanıcı rollerine (Yönetici, Montajcı, Üretimci) göre ö
 
 Proje, modern web teknolojileri ve en iyi pratikler göz önünde bulundurularak geliştirilmiş olup, özellikle server-side DataTable entegrasyonu, yumuşak silme (soft delete) mekanizmaları, otomatik seri numarası üretimi ve rol bazlı yetkilendirme gibi özelliklerle donatılmıştır.
 
-[Resim: Projenin Genel Akışını Gösteren Bir Diyagram veya Ana Panel Görüntüsü]
+![Resim: Ana Ekranda Stok Seviyeleri Uyarısı](./screenshots/app_admin_1_anasayfa.png)
 
 ## Kullanılan Teknolojiler
 
@@ -48,8 +48,8 @@ Bu bölümde, "Uygulama İsterleri" ve "Ekstralar (Bonus)" başlıkları altınd
 
 - **Parçalar (Kanat, Gövde, Kuyruk, Aviyonik):**
   - `PartCategory` enum'ı ile 4 ana kategori sabit olarak tanımlanmıştır.
-  - `PartType` modeli, bu kategorileri ve hangi takım tipi tarafından üretilebileceğini (kod içinde sabitlenmiş mantıkla) yönetir. Admin panelinden yeni kategori eklenemez, sadece mevcutların ilişkileri (eğer olsaydı) yönetilebilirdi.
-  - Her bir fiziksel parça `Part` modelinde, benzersiz seri numarası, uyumlu olduğu uçak modeli, üreten takım/personel, üretim tarihi ve durumu (`AVAILABLE`, `USED`, `IN_PRODUCTION`, `DEFECTIVE`, `RECYCLED`) ile takip edilir.
+  - `PartType` modeli, bu kategorileri ve hangi takım tipi tarafından üretilebileceğini (kod içinde sabitlenmiş mantıkla) yönetir. Admin panelinden yeni kategori eklenemez, sadece mevcutların ilişkileri yönetilebilir.
+  - Her bir fiziksel parça `Part` modelinde, benzersiz seri numarası, uyumlu olduğu uçak modeli, üreten takım/personel, üretim tarihi ve durumu (`AVAILABLE`, `USED`, `RECYCLED`) ile takip edilir.
 - **Uçaklar (TB2, TB3, AKINCI, KIZILELMA):**
   - `AircraftModelChoices` enum'ı ile 4 ana uçak modeli sabit olarak tanımlanmıştır.
   - `AircraftModel` modeli bu sabit tipleri temsil eder. Admin panelinden yeni model eklenemez. Bu modeller data migration ile veritabanına eklenmiştir.
@@ -72,12 +72,14 @@ Bu bölümde, "Uygulama İsterleri" ve "Ekstralar (Bonus)" başlıkları altınd
 
     - `Personnel` modeli, Django'nun `User` modelini `OneToOneField` ile genişletir ve her personelin bir `Team`'e atanmasını sağlar (`ForeignKey`).
     - Bir takımda birden fazla personel (`Team.members` ters ilişkisi) olabilir.
-    - Admin panelinden ve ileride API üzerinden personel-takım atamaları yönetilebilir.
+    - Admin ve uygulama yönetim panelinden personel-takım atamaları yönetilebilir.
 
 3.  **Takımların Parça Yönetimi (Üretimci Rolü):**
 
     - **Üretme:** Üretimci personel, frontend arayüzündeki "Parça Üret" formundan sadece hedef uçak modelini seçerek parça üretebilir. Parçanın tipi (kategorisi), üreten takım ve üreten personel API (`PartViewSet.perform_create`) tarafından otomatik olarak atanır. Seri numarası da modelin `save()` metodunda otomatik üretilir.
-      - [Resim: Parça Üretme Formu (Görsel Uçak Seçimi ile) Görüntüsü]
+
+![Resim: app_uretimci_2_parca_uretme_api_korumali_kendine_ait_olmayani_uretemez](./screenshots/app_uretimci_2_parca_uretme_api_korumali_kendine_ait_olmayani_uretemez.png)
+
     - **Listeleme:** Üretimci, `/api/parts/` endpoint'i üzerinden sadece kendi takımının ürettiği parçaları (tüm durumlar dahil, filtreleme imkanıyla) listeleyebilir. Bu liste, frontend'de server-side DataTable ile gösterilir.
     - **Geri Dönüşüm (Yumuşak Silme):** Üretimci, kendi takımının ürettiği ve henüz bir uçağa takılı olmayan (`USED` durumunda olmayan) parçaları "geri dönüştürebilir". Bu işlem, API (`DELETE /api/parts/{id}/`) üzerinden parçanın durumunu `RECYCLED` olarak günceller. Fiziksel silme yapılmaz.
 
@@ -86,7 +88,7 @@ Bu bölümde, "Uygulama İsterleri" ve "Ekstralar (Bonus)" başlıkları altınd
 4.  **Takım Sorumlulukları ve Kısıtlamalar:**
 
     - **Takımlar kendi sorumluluğundan başka parça üretemez:** `Part.clean()` metodu ve `PartViewSet.perform_create()` içinde, bir parçayı üretecek takımın tipinin, o parçanın kategorisini üretebilme yeteneğine sahip olup olmadığı kontrol edilir. (Örn: Aviyonik Takımı sadece Aviyonik kategorisinde parça üretebilir).
-    - **Montaj takımı parça üretemez:** `IsNotAssemblyTeamForCreate` özel izin sınıfı ve `PartViewSet.perform_create()` içindeki kontrollerle engellenir.
+    - **Montaj takımı parça üretemez:** Özel izin sınıfı ve `PartViewSet.perform_create()` içindeki kontrollerle engellenir.
 
 5.  **Montaj Takımının Uçak Üretimi (Montajcı Rolü):**
 
@@ -102,7 +104,7 @@ Bu bölümde, "Uygulama İsterleri" ve "Ekstralar (Bonus)" başlıkları altınd
 
 7.  **Montaj Takımının Üretilen Uçakları Listelemesi:**
 
-    - Montajcı, `/api/aircraft/` endpoint'i üzerinden sadece kendi takımının monte ettiği uçakları (tüm durumlar dahil, filtreleme imkanıyla) listeleyebilir. Bu liste, frontend'de server-side DataTable ile gösterilir.
+    - Montajcı, `/api/aircraft/` endpoint'i üzerinden sadece kendi takımının monte ettiği uçakları (tüm durumlar dahil, filtreleme imkanıyla) listeleyebilir. Bu liste, frontend'de server-side DataTable ile gösterilir. Montajcı, bir uçağı geri dönüştüremez.
 
 ![Resim: Montajcının Uçak Listesi (DataTable ile) Görüntüsü](./screenshots/app_montajci_2_takimin_urettigi_ucaklar.png)
 
@@ -110,33 +112,38 @@ Bu bölümde, "Uygulama İsterleri" ve "Ekstralar (Bonus)" başlıkları altınd
 
     - `/api/inventory/stock-levels/` API endpoint'i, her bir (Uçak Modeli, Parça Tipi) kombinasyonu için `AVAILABLE` stok sayısını ve eğer bu sayı sıfır ise `warning_zero_stock: true` bilgisini döndürür.
     - Frontend'de bu bilgi kullanılarak, özellikle ana panelde veya stok seviyeleri sayfasında, stoğu bitmiş parçalar için uyarılar gösterilir. Rol bazlı (Admin/Montajcı tümünü, Üretimci kendi kategorisini) uyarı gösterimi yapılır.
-      [Resim: Stok Seviyeleri Sayfası (Uyarılarla Birlikte) Görüntüsü](./screenshots/app_admin_5_parca_ucak_stok_izle.png)
+![Resim: Stok Seviyeleri Sayfası (Uyarılarla Birlikte) Görüntüsü](./screenshots/app_admin_5_parca_ucak_stok_izle.png)
 
 ![Resim: Ana Ekranda Stok Seviyeleri Uyarısı](./screenshots/app_admin_1_anasayfa.png)
 
 9.  **Parça Kullanım ve Stok Azaltma:**
 
-    - **1 uçakta kullanılan parça başka uçakta kullanılamaz:** `Aircraft` modelindeki `wing`, `fuselage`, `tail`, `avionics` alanları `Part` modeline `OneToOneField` ile bağlıdır. Bu, bir parçanın aynı anda sadece bir uçağın bir slotunda kullanılabilmesini garantiler.
+    - **Bir uçakta kullanılan parça başka uçakta kullanılamaz:** `Aircraft` modelindeki `wing`, `fuselage`, `tail`, `avionics` alanları `Part` modeline `OneToOneField` ile bağlıdır. Bu, bir parçanın aynı anda sadece bir uçağın bir slotunda kullanılabilmesini garantiler.
     - **Stok sayısından azaltılmalıdır:** Bir parça uçağa monte edildiğinde (`Aircraft.save()` metodu içinde), o parçanın `status` alanı `USED` (Kullanıldı) olarak güncellenir. "Mevcut stok" sayısı, `status='AVAILABLE'` olan parçaların sayılmasıyla dinamik olarak hesaplandığı için, `USED` olan bir parça otomatik olarak mevcut stoktan düşmüş olur.
 
 10. **Kullanılan Parça Bilgilerinin Takibi:**
     - `Aircraft` modeli, `wing`, `fuselage`, `tail`, `avionics` alanları aracılığıyla hangi spesifik `Part` nesnelerinin kullanıldığını doğrudan saklar.
-    - `Part` modelindeki `get_installed_aircraft_info()` metodu ve `PartSerializer`'daki ilgili alan, bir parçanın hangi uçakta ve hangi rolde kullanıldığını gösterir.
+    - `Part` modelindeki `get_installed_aircraft_info()` metodu ve `PartSerializer`'daki ilgili alan, bir parçanın hangi uçakta kullanıldığını gösterir.
     - Bu bilgiler, API cevaplarında ve frontend listelemelerinde sunulur.
 
 ### Teknoloji İsterleri ve Ekstralar (Bonus)
 
 - **Python, Django, PostgreSQL, Django Rest Framework:** Projenin temelini oluşturmaktadır.
 - **Server-Side DataTable Kullanılması:** İş Emirleri, Parçalar ve Uçaklar için listeleme API'leri (`WorkOrderViewSet`, `PartViewSet`, `AircraftViewSet`) DRF'in pagination, filtreleme (`django-filter`, `OrderingFilter`, `SearchFilter`) özellikleriyle donatılmış ve frontend'de jQuery DataTables'ın server-side processing moduyla entegre edilmiştir. Bu, performanslı ve kullanıcı dostu listelemeler sağlar.
-  - [Resim: İş Emri Listesi (Server-Side DataTable ile) Görüntüsü]
+![Resim: İş Emri Listesi (Server-Side DataTable ile)](./screenshots/app_admin_2_isemri_olustur_duzenle_sil.png)
+
 - **Ön Yüzde Asenkron (Ajax, Fetch vs.) Yapı Kullanılması:** Frontend'deki tüm veri çekme, form gönderme ve dinamik içerik güncellemeleri jQuery Ajax kullanılarak API endpoint'leri üzerinden asenkron olarak yapılmaktadır.
 - **İlişkisel Tabloların Ayrı Ayrı Tutulması:** Django ORM'nin doğası gereği, modellerimiz (`Team`, `Part`, `Aircraft` vb.) veritabanında ayrı ilişkisel tablolar olarak temsil edilmektedir. `ForeignKey`, `OneToOneField` gibi alanlarla bu tablolar arasında mantıksal bağlantılar kurulmuştur.
+![Resim: database_relations](./screenshots/database_relations.png)
 - **Django İçin Ekstra Kütüphaneler Kullanılması:** `django-filter` ve `drf-spectacular` gibi kütüphaneler projeye değer katmıştır.
 - **Ön Yüze (Front-End) Bootstrap, Tailwind, Jquery vs. Kullanılması:** Frontend arayüzü Bootstrap 5 ve jQuery kullanılarak geliştirilmiştir.
 - **API Docs (Swagger):** `drf-spectacular` kütüphanesi ile `/api/schema/swagger-ui/` ve `/api/schema/redoc/` adreslerinde otomatik API dokümantasyonu sunulmaktadır.
-  - [Resim: Swagger UI Arayüzü Görüntüsü]
+![Resim: swagger_ui_redoc](./screenshots/swagger_ui_redoc.png)
+![Resim: swagger_ui_schema](./screenshots/swagger_ui_schema.png)
 - **İyi Hazırlanmış Dokümantasyon ve Yorum Satırları:** Bu README dosyası ve kod içindeki yorumlar bu maddeyi karşılamayı hedefler.
-- **Projenin Docker ile Ayağa Kalkması ve Birim Testi:** Bu iki madde, belirtilen proje süresi ve öncelikler doğrultusunda bu aşamada **tamamlanmamıştır**, ancak projenin gelecekteki geliştirmeleri için önemli adımlardır.
+- **Projenin Docker ile Ayağa Kalkması:** Projenin tam kapsamlı, içinde verileri de dahil olmak üzere alınmış docker imaj yedeği bu repo içerisinde ve Docker Hub'da mevcuttur.
+- **Manuel Testler:** Zaman kısıtından dolayı birim test tamamlanamamış olsa da detaylı manuel ön yüz ve API tüm senaryolarla detaylı olarak yapılmıştır.
+![Resim: postman_sample_api_list_screen](./screenshots/postman_sample_api_list_screen.png)
 
 ## Kurulum ve Çalıştırma
 
@@ -228,6 +235,7 @@ Projeyi lokal makinenizde kurmak ve çalıştırmak için aşağıdaki adımlar�
     ```bash
     docker pull isikmuhamm/uav-production-app:latest
     ```
+-Django server üzerinde 7. maddede verilen bilgi ile süper yetkili bir hesap oluşturulabilir. Bunun yerine mevcut olan hesaplar da kullanılarak ürün incelenebilir. Yönetici hesabı "bayraktar" olup bütün şifreler "Sifre1234" olarak belirlenmiştir.
 
 ## API Endpoint'lerine Genel Bakış
 
@@ -333,7 +341,7 @@ Proje, aşağıdaki ana API endpoint'lerini sunmaktadır (Detaylar için Swagger
 - [ ] Birim Testi.
 - [x] Listeleme sayfaları için datatable kullanılması (İş emirleri için tamam, diğerlerine yaygınlaştırılacak).
 
-## Projeni Tüm Fotoğrafları
+## Projenin Tüm Fotoğrafları
 
 ### Yöneticinin gördüğü django database yönetim ekranları
 
