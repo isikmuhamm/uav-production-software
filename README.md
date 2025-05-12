@@ -2,7 +2,7 @@
 
 ## Proje Tanıtımı
 
-Bu proje, bir iş başvurusu kapsamında geliştirilmiş bir **Hava Aracı Üretim Takip Sistemi**'dir. Django ve Django Rest Framework kullanılarak geliştirilen bu uygulama, farklı hava aracı modellerinin (TB2, TB3, AKINCI, KIZILELMA) üretim süreçlerini, parça yönetimini (Kanat, Gövde, Kuyruk, Aviyonik), takım ve personel yönetimini, iş emirlerini ve stok takibini kapsamaktadır.
+Bu proje, bir durum çalışması (case study) kapsamında geliştirilmiş bir **Hava Aracı Üretim Takip Sistemi**'dir. Django ve Django Rest Framework kullanılarak geliştirilen bu uygulama, farklı hava aracı modellerinin (TB2, TB3, AKINCI, KIZILELMA) üretim süreçlerini, parça yönetimini (Kanat, Gövde, Kuyruk, Aviyonik), takım ve personel yönetimini, iş emirlerini ve stok takibini kapsamaktadır.
 
 Sistem, farklı kullanıcı rollerine (Yönetici, Montajcı, Üretimci) göre özelleştirilmiş arayüzler ve yetkilendirmeler sunarak, üretim sürecinin her aşamasının verimli bir şekilde yönetilmesini hedefler. API tabanlı mimarisi sayesinde, gelecekte farklı platformlarla entegrasyon potansiyeline sahiptir.
 
@@ -76,13 +76,11 @@ Bu bölümde, "Uygulama İsterleri" ve "Ekstralar (Bonus)" başlıkları altınd
 
 3.  **Takımların Parça Yönetimi (Üretimci Rolü):**
 
-    - **Üretme:** Üretimci personel, frontend arayüzündeki "Parça Üret" formundan sadece hedef uçak modelini seçerek parça üretebilir. Parçanın tipi (kategorisi), üreten takım ve üreten personel API (`PartViewSet.perform_create`) tarafından otomatik olarak atanır. Seri numarası da modelin `save()` metodunda otomatik üretilir.
+     - **Üretme:** Üretimci personel, frontend arayüzündeki "Parça Üret" formundan sadece hedef uçak modelini seçerek parça üretebilir. Parçanın tipi (kategorisi), üreten takım ve üreten personel API (`PartViewSet.perform_create`) tarafından otomatik olarak atanır. Seri numarası da modelin `save()` metodunda otomatik üretilir.
+     - **Listeleme:** Üretimci, `/api/parts/` endpoint'i üzerinden sadece kendi takımının ürettiği parçaları (tüm durumlar dahil, filtreleme imkanıyla) listeleyebilir. Bu liste, frontend'de server-side DataTable ile gösterilir.
+     - **Geri Dönüşüm (Yumuşak Silme):** Üretimci, kendi takımının ürettiği ve henüz bir uçağa takılı olmayan (`USED` durumunda olmayan) parçaları "geri dönüştürebilir". Bu işlem, API (`DELETE /api/parts/{id}/`) üzerinden parçanın durumunu `RECYCLED` olarak günceller. Fiziksel silme yapılmaz.
 
 ![Resim: app_uretimci_2_parca_uretme_api_korumali_kendine_ait_olmayani_uretemez](./screenshots/app_uretimci_2_parca_uretme_api_korumali_kendine_ait_olmayani_uretemez.png)
-
-    - **Listeleme:** Üretimci, `/api/parts/` endpoint'i üzerinden sadece kendi takımının ürettiği parçaları (tüm durumlar dahil, filtreleme imkanıyla) listeleyebilir. Bu liste, frontend'de server-side DataTable ile gösterilir.
-    - **Geri Dönüşüm (Yumuşak Silme):** Üretimci, kendi takımının ürettiği ve henüz bir uçağa takılı olmayan (`USED` durumunda olmayan) parçaları "geri dönüştürebilir". Bu işlem, API (`DELETE /api/parts/{id}/`) üzerinden parçanın durumunu `RECYCLED` olarak günceller. Fiziksel silme yapılmaz.
-
 ![Resim: Üretimcinin Parça Listesi (DataTable ve Geri Dönüştürme Butonu ile) Görüntüsü](./screenshots/app_uretimci_3_takimimin_urettigi_parcalar.png)
 
 4.  **Takım Sorumlulukları ve Kısıtlamalar:**
@@ -236,7 +234,7 @@ Projeyi lokal makinenizde kurmak ve çalıştırmak için aşağıdaki adımlar�
     ```bash
     docker pull isikmuhamm/uav-production-app:latest
     ```
--Django server üzerinde 7. maddede verilen bilgi ile süper yetkili bir hesap oluşturulabilir. Bunun yerine mevcut olan hesaplar da kullanılarak ürün incelenebilir. Yönetici hesabı "bayraktar" olup bütün şifreler "Sifre1234" olarak belirlenmiştir.
+    - Django server üzerinde 7. maddede verilen bilgi ile süper yetkili bir hesap oluşturulabilir. Bunun yerine mevcut olan hesaplar da kullanılarak ürün incelenebilir. Yönetici hesabı "bayraktar" olup bütün şifreler "Sifre1234" olarak belirlenmiştir.
 
 ## API Endpoint'lerine Genel Bakış
 
