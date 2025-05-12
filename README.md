@@ -112,6 +112,7 @@ Bu bölümde, "Uygulama İsterleri" ve "Ekstralar (Bonus)" başlıkları altınd
 
     - `/api/inventory/stock-levels/` API endpoint'i, her bir (Uçak Modeli, Parça Tipi) kombinasyonu için `AVAILABLE` stok sayısını ve eğer bu sayı sıfır ise `warning_zero_stock: true` bilgisini döndürür.
     - Frontend'de bu bilgi kullanılarak, özellikle ana panelde veya stok seviyeleri sayfasında, stoğu bitmiş parçalar için uyarılar gösterilir. Rol bazlı (Admin/Montajcı tümünü, Üretimci kendi kategorisini) uyarı gösterimi yapılır.
+
 ![Resim: Stok Seviyeleri Sayfası (Uyarılarla Birlikte) Görüntüsü](./screenshots/app_admin_5_parca_ucak_stok_izle.png)
 
 ![Resim: Ana Ekranda Stok Seviyeleri Uyarısı](./screenshots/app_admin_1_anasayfa.png)
@@ -323,23 +324,22 @@ Proje, aşağıdaki ana API endpoint'lerini sunmaktadır (Detaylar için Swagger
 - [x] Statik dosyalar (`main.js`) ve global JavaScript değişkenleri ayarlandı.
 - [x] Personel giriş/çıkış işlevselliği API'ye bağlandı.
 - [x] Dashboard'da rol bazlı menü ve temel içerik alanlarının gösterimi/gizlenmesi.
-- [x] **İş Emirleri Listeleme (Admin):** Server-side DataTable ile entegre edildi (sayfalandırma, arama, sıralama, durum filtresi çalışıyor).
+- [x] **Bütün izleme ve takip listeleri:** Server-side DataTable ile entegre edildi. Sayfalandırma, arama, sıralama, durum filtreleri eklendi.
 - [x] **Görsel Uçak Seçimi:** Formlarda (İş Emri, Parça Üret, Uçak Montaj) tıklanabilir resimlerle uçak modeli seçimi.
-- [x] **Formlar:** Yeni İş Emri, Parça Üret, Uçak Montaj formları Ajax ile API'ye bağlanıyor, çift istek sorunları çözüldü.
-- [x] **Stok Seviyeleri:** API'den veri çekilip gösteriliyor (gösterim iyileştirmesi yapılacak).
+- [x] **Formlar:** Yeni İş Emri, Parça Üret, Uçak Montaj formları Ajax ile API'ye bağlanıyor.
+- [x] **Stok Seviyeleri:** API'den veri çekilip datatable ile gösteriliyor.
 
 ### VI. Ekstralar (Bonus)
 
-- [x] Server-Side DataTable Kullanılması (İş Emirleri için tamamlandı, diğerleri için planlandı).
+- [x] Server-Side DataTable Kullanılması. Bütün listeleme sayfaları için tamamlandı.
 - [x] Ön Yüzde Asenkron (Ajax, Fetch vs.) Yapı Kullanılması.
 - [x] İlişkisel Tabloların Ayrı Ayrı Tutulması.
 - [x] Django İçin Ekstra Kütüphaneler Kullanılması (`django-filter`, `drf-spectacular`).
 - [x] Ön Yüzde (Front-End) Bootstrap, Jquery Kullanılması.
-- [x] API Docs (Swagger).
+- [x] API Docs (Swagger). Kod içerisinde yazılmış detaylı bilgi satırlarıyla otomatik oluşan dokumanlar.
 - [x] Projenin Docker ile Ayağa Kalkması.
-- [x] İyi Hazırlanmış Dokümantasyon ve Yorum Satırları (Bu README ve kod içi yorumlarla devam ediyor).
-- [ ] Birim Testi.
-- [x] Listeleme sayfaları için datatable kullanılması (İş emirleri için tamam, diğerlerine yaygınlaştırılacak).
+- [x] İyi Hazırlanmış Dokümantasyon ve Yorum Satırları (Bu README ve kod içi yorumlar tamamlandı.
+- [ ] Birim Testi yapılmadı, ancak manuel ve API testleri kapsamlı senaryolarla tamamlandı.
 
 ## Projenin Tüm Fotoğrafları
 
