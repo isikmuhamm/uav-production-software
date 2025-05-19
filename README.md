@@ -40,9 +40,9 @@ Projenin geliştirilmesinde aşağıdaki teknolojiler ve kütüphaneler kullanı
   - VSCode
   - Python Sanal Ortamı (`venv`)
 
-## Proje Özellikleri ve Uygulama İsterlerinin Karşılanması
+## Proje Özellikleri ve Uygulama İşleyişi
 
-Bu bölümde, "Uygulama İsterleri" ve "Ekstralar (Bonus)" başlıkları altında belirtilen maddelerin projede nasıl hayata geçirildiği detaylandırılmaktadır. Screenshots klasöründe her ekranın detaylı fotoğrafı ve açıklaması fotoğraf olarak da paylaşılmıştır.
+Bu bölümde, ilgili özellikler ve özelliklerin projede nasıl hayata geçirildiği detaylandırılmaktadır. Screenshots klasöründe her ekranın detaylı fotoğrafı ve açıklaması fotoğraf olarak da paylaşılmıştır.
 
 ### Temel Varlıklar ve Yönetimi
 
