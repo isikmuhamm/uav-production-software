@@ -2,7 +2,7 @@
 
 ## Proje Tanıtımı
 
-Bu proje, bir durum çalışması (case study) kapsamında geliştirilmiş bir **Hava Aracı Üretim Takip Sistemi**'dir. Django ve Django Rest Framework kullanılarak geliştirilen bu uygulama, farklı hava aracı modellerinin (TB2, TB3, AKINCI, KIZILELMA) üretim süreçlerini, parça yönetimini (Kanat, Gövde, Kuyruk, Aviyonik), takım ve personel yönetimini, iş emirlerini ve stok takibini kapsamaktadır.
+Bu proje, bir **Hava Aracı Üretim Takip Sistemi**'dir. Django ve Django Rest Framework kullanılarak geliştirilen bu uygulama, örnek olarak kullanılan farklı hava aracı modellerinin (TB2, TB3, AKINCI, KIZILELMA) üretim süreçlerini, örnek parça yönetimini (Kanat, Gövde, Kuyruk, Aviyonik), takım ve personel yönetimini, iş emirlerini ve stok takibini kapsamaktadır.
 
 Sistem, farklı kullanıcı rollerine (Yönetici, Montajcı, Üretimci) göre özelleştirilmiş arayüzler ve yetkilendirmeler sunarak, üretim sürecinin her aşamasının verimli bir şekilde yönetilmesini hedefler. API tabanlı mimarisi sayesinde, gelecekte farklı platformlarla entegrasyon potansiyeline sahiptir.
 
@@ -42,7 +42,7 @@ Projenin geliştirilmesinde aşağıdaki teknolojiler ve kütüphaneler kullanı
 
 ## Proje Özellikleri ve Uygulama İsterlerinin Karşılanması
 
-Bu bölümde, "Uygulama İsterleri" ve "Ekstralar (Bonus)" başlıkları altında belirtilen maddelerin projede nasıl hayata geçirildiği detaylandırılmaktadır. Projenin birim test haricindeki tüm isterleri karşılanmıştır. Screenshots klasöründe her ekranın detaylı fotoğrafı ve açıklaması fotoğraf olarak da paylaşılmıştır.
+Bu bölümde, "Uygulama İsterleri" ve "Ekstralar (Bonus)" başlıkları altında belirtilen maddelerin projede nasıl hayata geçirildiği detaylandırılmaktadır. Screenshots klasöründe her ekranın detaylı fotoğrafı ve açıklaması fotoğraf olarak da paylaşılmıştır.
 
 ### Temel Varlıklar ve Yönetimi
 
@@ -59,7 +59,7 @@ Bu bölümde, "Uygulama İsterleri" ve "Ekstralar (Bonus)" başlıkları altınd
   - `Team` modeli, admin tarafından oluşturulabilen takımları, adlarını ve bu sabit tiplerden birini içerir.
   - Bir takımın montaj yapabilme (`can_perform_assembly()`) veya hangi parça kategorisini üretebileceği (`get_producible_part_category()`) yetenekleri, modeldeki `team_type` alanına göre dinamik olarak belirlenir.
 
-### Fonksiyonel İsterler
+### Temel Uygulama İşleyiş ve Özellikleri
 
 1.  **Personel Giriş Ekranı:**
 
@@ -125,7 +125,7 @@ Bu bölümde, "Uygulama İsterleri" ve "Ekstralar (Bonus)" başlıkları altınd
     - `Part` modelindeki `get_installed_aircraft_info()` metodu ve `PartSerializer`'daki ilgili alan, bir parçanın hangi uçakta kullanıldığını gösterir.
     - Bu bilgiler, API cevaplarında ve frontend listelemelerinde sunulur.
 
-### Teknoloji İsterleri ve Ekstralar (Bonus)
+### Kullanılan Teknolojilere Dayalı Özellikler
 
 - **Python, Django, PostgreSQL, Django Rest Framework:** Projenin temelini oluşturmaktadır.
 - **Server-Side DataTable Kullanılması:** İş Emirleri, Parçalar ve Uçaklar için listeleme API'leri (`WorkOrderViewSet`, `PartViewSet`, `AircraftViewSet`) DRF'in pagination, filtreleme (`django-filter`, `OrderingFilter`, `SearchFilter`) özellikleriyle donatılmış ve frontend'de jQuery DataTables'ın server-side processing moduyla entegre edilmiştir. Bu, performanslı ve kullanıcı dostu listelemeler sağlar.
@@ -252,7 +252,7 @@ Proje, aşağıdaki ana API endpoint'lerini sunmaktadır (Detaylar için Swagger
 - `/api/assembly/assemble-aircraft/` (POST - Montajcı yetkili): Otomatik parça atama ile uçak montajı.
 - `/api/inventory/stock-levels/` (GET): Rol bazlı parça ve uçak stok seviyelerini listeleme.
 
-## Projenin Geliştirilme Adımları, Proje Gereksinimlerin Tamamlanma Durumu
+## Projenin Geliştirilme Adımları
 
 ### I. Temel Altyapı ve Veritabanı
 
@@ -337,7 +337,7 @@ Proje, aşağıdaki ana API endpoint'lerini sunmaktadır (Detaylar için Swagger
 - [x] API Docs (Swagger). Kod içerisinde yazılmış detaylı bilgi satırlarıyla otomatik oluşan dokumanlar.
 - [x] Projenin Docker ile Ayağa Kalkması.
 - [x] İyi Hazırlanmış Dokümantasyon ve Yorum Satırları (Bu README ve kod içi yorumlar tamamlandı.
-- [ ] Birim Testi yapılmadı, ancak manuel ve API testleri kapsamlı senaryolarla tamamlandı.
+- [x] Manuel ve API testleri kapsamlı senaryolarla tamamlandı.
 
 ## Projenin Tüm Fotoğrafları
 
@@ -396,10 +396,9 @@ Proje, aşağıdaki ana API endpoint'lerini sunmaktadır (Detaylar için Swagger
 
 ## Katkıda Bulunma
 
-Bu proje bir case study olarak geliştirilmiş olup, şu an için aktif katkı kabul etmemektedir. Ancak, olası iyileştirme önerileri veya hata bildirimleri için GitHub Issues bölümünü kullanabilirsiniz.
-
+Olası iyileştirme önerileri veya hata bildirimleri için kendi alt dalınızı oluşturarak güncellemeleri gönderebilirsiniz.
 Eğer projeyi fork'layıp kendi geliştirmelerinizi yapmak isterseniz, standart Git ve GitHub akışlarını takip edebilirsiniz.
 
 ## Lisans
 
-Bu proje için bir lisans belirtilmemiştir.
+Bu proje MIT lisansı altında lisanslanmıştır.
